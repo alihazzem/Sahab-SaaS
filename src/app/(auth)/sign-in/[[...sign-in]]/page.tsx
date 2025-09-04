@@ -77,7 +77,7 @@ export default function SignInPage() {
                 {/* Sign In Form */}
                 <Card className="border-border shadow-lg">
                     <CardHeader className="space-y-1 pb-4">
-                        <CardTitle className="text-xl font-semibold text-center">Welcome back</CardTitle>
+                        <CardTitle className="text-3xl font-semibold text-center">Welcome back</CardTitle>
                         <CardDescription className="text-center text-muted-foreground">
                             Sign in to your Cloudinary SaaS account
                         </CardDescription>
