@@ -14,14 +14,22 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Video {
+model Media {
   id             String   @id @default(cuid())
-  title          String
+  userId         String // Clerk user ID
+  type           String // "video" | "image"
+  title          String?
   description    String?
-  publicId       String
-  originalSize   String
-  compressedSize String
-  duration       String
+  publicId       String // Cloudinary public ID
+  url            String // original upload
+  versions       Json? // store multiple resolutions as JSON (1080p, 720p, 480p)
+  originalSize   Int
+  compressedSize Int?
+  duration       Int? // seconds, only for videos
+  width          Int? // only for images
+  height         Int? // only for images
+  tags           String[] @default([])
+  optimized      Boolean  @default(false)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 }

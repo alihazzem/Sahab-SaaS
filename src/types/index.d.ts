@@ -33,4 +33,5 @@ export interface UploadOptions {
     folder: string;
     resourceType?: "image" | "video" | "raw";
     eager?: CloudinaryEagerTransformation[];
+    eager_async?: boolean;
 }
