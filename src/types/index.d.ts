@@ -35,3 +35,15 @@ export interface UploadOptions {
     eager?: CloudinaryEagerTransformation[];
     eager_async?: boolean;
 }
+
+export interface FloatingParticlesProps {
+    count?: number
+}
+
+export interface Particle {
+    id: number
+    left: number
+    top: number
+    animationDelay: number
+    animationDuration: number
+}

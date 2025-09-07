@@ -192,7 +192,7 @@ export default function SignInPage() {
                                         Remember me
                                     </Label>
                                 </div>
-                                <Link href="/forgot-password" className="text-primary hover:text-primary/80 font-medium transition-colors">
+                                <Link href="/auth/forgot-password" className="text-primary hover:text-primary/80 font-medium transition-colors">
                                     Forgot password?
                                 </Link>
                             </div>
@@ -209,7 +209,7 @@ export default function SignInPage() {
                         <div className="mt-6 text-center">
                             <p className="text-sm text-muted-foreground">
                                 Don&apos;t have an account?{" "}
-                                <Link href="/sign-up" className="text-primary hover:text-primary/80 font-medium transition-colors">
+                                <Link href="/auth/sign-up" className="text-primary hover:text-primary/80 font-medium transition-colors">
                                     Sign up
                                 </Link>
                             </p>

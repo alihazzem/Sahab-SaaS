@@ -60,6 +60,7 @@ export async function POST(req: NextRequest) {
                 description,
                 publicId: uploadResponse.public_id,
                 url: uploadResponse.secure_url!,
+                versions,
                 originalSize: file.size,
                 compressedSize: uploadResponse.eager?.[0]?.bytes ?? null,
                 duration: Math.round(uploadResponse.duration ?? 0),
