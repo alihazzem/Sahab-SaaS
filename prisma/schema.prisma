@@ -33,3 +33,74 @@ model Media {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 }
+
+model Plan {
+  id                   String         @id @default(cuid())
+  name                 String         @unique
+  price                Int // stored in piastres (EGP * 100)
+  currency             String         @default("EGP")
+  storageLimit         Int // MB
+  maxUploadSize        Int // MB
+  transformationsLimit Int
+  teamMembers          Int
+  supportLevel         String
+  subscriptions        Subscription[]
+  payments             Payment[]
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+}
+
+model Subscription {
+  id        String             @id @default(cuid())
+  userId    String             @unique // Clerk user ID
+  planId    String
+  plan      Plan               @relation(fields: [planId], references: [id])
+  startDate DateTime           @default(now())
+  endDate   DateTime
+  status    SubscriptionStatus
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  userId        String // Clerk user ID
+  planId        String
+  plan          Plan          @relation(fields: [planId], references: [id])
+  amount        Int // in piastres
+  currency      String        @default("EGP")
+  status        PaymentStatus
+  provider      String // "paymob"
+  providerTxnId String? // Paymob transaction ID
+  metadata      Json? // store Paymob response data
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model UsageTracking {
+  id                  String   @id @default(cuid())
+  userId              String // Clerk user ID
+  storageUsed         Int      @default(0) // MB
+  transformationsUsed Int      @default(0)
+  uploadsCount        Int      @default(0)
+  month               Int // 1-12
+  year                Int
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([userId, month, year])
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  EXPIRED
+  PAST_DUE
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
