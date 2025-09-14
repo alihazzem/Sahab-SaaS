@@ -4,7 +4,7 @@ import { uploadToCloudinary } from "@/lib/uploadToCloudianry";
 import { isValidImageStrict } from "@/lib/validate";
 import prisma from "@/lib/prisma";
 
-const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB for supporting images
+const MAX_THUMBNAIL_SIZE = 2 * 1024 * 1024; // 2MB for thumbnails/profile pics
 
 export async function POST(req: NextRequest) {
     const { userId } = await auth();
@@ -20,9 +20,9 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
         }
 
-        // Simple size check for supporting images (no plan verification needed)
-        if (file.size > MAX_IMAGE_SIZE) {
-            return NextResponse.json({ error: "Image too large. Max 5MB" }, { status: 413 });
+        // Simple size check for thumbnails/profile pics
+        if (file.size > MAX_THUMBNAIL_SIZE) {
+            return NextResponse.json({ error: "Image too large. Max 2MB for thumbnails" }, { status: 413 });
         }
 
         const bytes = await file.arrayBuffer();
@@ -32,23 +32,26 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Uploaded file is not a valid image" }, { status: 400 });
         }
 
-        // Upload to Cloudinary
         const uploadResponse = await uploadToCloudinary(buffer, {
-            folder: "SkyMedia-SaaS/images",
+            folder: "SkyMedia-SaaS/profiles",
             resourceType: "image",
+            // Optimize for thumbnails
+            eager: [
+                { width: 400, height: 400, crop: "limit", quality: "auto", format: "webp" }
+            ]
         });
 
-        // Extract width and height from response if available
+        // Extract width and height from response
         const width: number | null = typeof uploadResponse.width === "number" ? uploadResponse.width : null;
         const height: number | null = typeof uploadResponse.height === "number" ? uploadResponse.height : null;
 
-        // Save to database
+        // Save thumbnail to database as 'image' type
         const savedMedia = await prisma.media.create({
             data: {
                 userId,
                 type: "image",
-                title: file.name || "Untitled Image",
-                description: null,
+                title: file.name || "Thumbnail/Profile Image",
+                description: "Thumbnail or profile image",
                 publicId: uploadResponse.public_id,
                 url: uploadResponse.secure_url || "",
                 originalSize: file.size,
@@ -56,12 +59,14 @@ export async function POST(req: NextRequest) {
                 duration: null,
                 width,
                 height,
-                versions: {},
-                optimized: false,
+                versions: {
+                    thumbnail: uploadResponse.eager?.[0]?.secure_url || uploadResponse.secure_url
+                },
+                optimized: true, // Thumbnails are pre-optimized
             },
         });
 
-        console.log(`✅ Image saved to database with ID: ${savedMedia.id}`);
+        console.log(`✅ Thumbnail saved to database with ID: ${savedMedia.id}`);
 
         return NextResponse.json({
             id: savedMedia.id,
@@ -73,7 +78,7 @@ export async function POST(req: NextRequest) {
         }, { status: 200 });
 
     } catch (error) {
-        console.error("Image upload error:", error);
+        console.error("Thumbnail upload error:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }

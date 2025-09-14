@@ -5,8 +5,6 @@ import { uploadToCloudinary } from "@/lib/uploadToCloudianry";
 import { isValidVideo } from "@/lib/validate";
 import { CloudinaryUploadResult } from "@/types";
 
-const MAX_VIDEO_SIZE = 100 * 1024 * 1024; // 100MB
-
 export async function POST(req: NextRequest) {
     const { userId } = await auth();
     if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -21,8 +19,66 @@ export async function POST(req: NextRequest) {
         if (!title) return NextResponse.json({ error: "Title is required" }, { status: 400 });
         if (!file.type.startsWith("video/"))
             return NextResponse.json({ error: "Uploaded file is not a video" }, { status: 400 });
-        if (file.size > MAX_VIDEO_SIZE)
-            return NextResponse.json({ error: "Video too large. Max 100MB" }, { status: 400 });
+
+        // Get user's current subscription and plan
+        const subscription = await prisma.subscription.findFirst({
+            where: { userId, status: 'ACTIVE' },
+            include: { plan: true }
+        });
+
+        const currentPlan = subscription?.plan || await prisma.plan.findFirst({
+            where: { name: 'Free' }
+        });
+
+        if (!currentPlan) {
+            return NextResponse.json({ error: "No plan found" }, { status: 500 });
+        }
+
+        // Check file size against plan limit
+        const maxFileSize = currentPlan.maxUploadSize * 1024 * 1024; // Convert MB to bytes
+        if (file.size > maxFileSize) {
+            return NextResponse.json({
+                error: `Video too large. Max ${currentPlan.maxUploadSize}MB for ${currentPlan.name} plan`
+            }, { status: 413 });
+        }
+
+        // Get or create current month usage
+        const currentDate = new Date();
+        const currentMonth = currentDate.getMonth() + 1;
+        const currentYear = currentDate.getFullYear();
+
+        let usage = await prisma.usageTracking.findFirst({
+            where: { userId, month: currentMonth, year: currentYear }
+        });
+
+        if (!usage) {
+            usage = await prisma.usageTracking.create({
+                data: {
+                    userId,
+                    month: currentMonth,
+                    year: currentYear,
+                    storageUsed: 0,
+                    transformationsUsed: 0,
+                    uploadsCount: 0
+                }
+            });
+        }
+
+        // Check storage limit
+        const storageLimit = currentPlan.storageLimit * 1024 * 1024; // Convert MB to bytes
+        if (usage.storageUsed + file.size > storageLimit) {
+            return NextResponse.json({
+                error: `Storage limit exceeded. Used ${Math.round(usage.storageUsed / (1024 * 1024))}MB of ${currentPlan.storageLimit}MB. Upgrade your plan for more storage.`
+            }, { status: 413 });
+        }
+
+        // Check transformations limit (video processing creates 3 versions)
+        const transformationsNeeded = 3; // 1080p, 720p, 480p
+        if (usage.transformationsUsed + transformationsNeeded > currentPlan.transformationsLimit) {
+            return NextResponse.json({
+                error: `Transformation limit exceeded. Used ${usage.transformationsUsed} of ${currentPlan.transformationsLimit} transformations. Upgrade your plan for more transformations.`
+            }, { status: 413 });
+        }
 
         const bytes = await file.arrayBuffer();
         const buffer = Buffer.from(bytes);
@@ -32,7 +88,7 @@ export async function POST(req: NextRequest) {
 
         // Upload to Cloudinary with multiple resolutions, async
         const uploadResponse: CloudinaryUploadResult = await uploadToCloudinary(buffer, {
-            folder: "cloudinary-saas/videos",
+            folder: "SkyMedia-SaaS/videos",
             resourceType: "video",
             eager: [
                 { width: 1920, height: 1080, crop: "limit", format: "mp4", quality: "auto" },
@@ -68,6 +124,16 @@ export async function POST(req: NextRequest) {
             },
         });
 
+        // Update usage tracking
+        await prisma.usageTracking.update({
+            where: { id: usage.id },
+            data: {
+                storageUsed: usage.storageUsed + file.size,
+                transformationsUsed: usage.transformationsUsed + transformationsNeeded,
+                uploadsCount: usage.uploadsCount + 1
+            }
+        });
+
         return NextResponse.json(
             {
                 id: savedMedia.id,
@@ -79,6 +145,12 @@ export async function POST(req: NextRequest) {
                 compressedSize: savedMedia.compressedSize,
                 duration: savedMedia.duration,
                 versions, // 1080p/720p/480p URLs
+                usage: {
+                    storageUsed: usage.storageUsed + file.size,
+                    storageLimit: storageLimit,
+                    transformationsUsed: usage.transformationsUsed + transformationsNeeded,
+                    transformationsLimit: currentPlan.transformationsLimit
+                }
             },
             { status: 200 }
         );

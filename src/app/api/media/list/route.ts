@@ -26,17 +26,30 @@ export async function GET(req: Request) {
                 type: true,
                 title: true,
                 description: true,
+                publicId: true,
+                url: true,
                 originalSize: true,
                 compressedSize: true,
                 duration: true,
+                width: true,
+                height: true,
                 versions: true,
+                createdAt: true,
+                optimized: true,
             },
         });
+
+        console.log(`Found ${media.length} media items for user ${userId}`);
 
         return NextResponse.json({
             success: true,
             count: media.length,
             data: media,
+            debug: {
+                userId,
+                type,
+                totalFound: media.length
+            }
         });
     } catch (error) {
         console.error("Media fetch error:", error);
