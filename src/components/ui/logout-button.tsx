@@ -2,11 +2,84 @@
 
 import { useClerk, useUser } from '@clerk/nextjs'
 import { Button } from '@/components/ui/button'
-import { LogOut } from 'lucide-react'
+import { LogOut, Camera, User } from 'lucide-react'
+import { useState, useRef } from 'react'
+import Image from 'next/image'
+
+function ProfilePicture() {
+    const { user } = useUser()
+    const [uploading, setUploading] = useState(false)
+    const fileInputRef = useRef<HTMLInputElement>(null)
+
+    const handleProfilePictureClick = () => {
+        fileInputRef.current?.click()
+    }
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file || !user) return
+
+        setUploading(true)
+        try {
+            await user.setProfileImage({ file })
+            // Force a re-render by updating the user
+            await user.reload()
+        } catch (error) {
+            console.error('Error updating profile picture:', error)
+            alert('Failed to update profile picture')
+        } finally {
+            setUploading(false)
+        }
+    }
+
+    const profileImageUrl = user?.imageUrl
+
+    return (
+        <div className="relative group">
+            <div
+                className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary/20 to-primary/5 border border-border cursor-pointer overflow-hidden transition-all hover:border-primary/50"
+                onClick={handleProfilePictureClick}
+            >
+                {profileImageUrl ? (
+                    <Image
+                        src={profileImageUrl}
+                        alt="Profile"
+                        width={40}
+                        height={40}
+                        className="object-cover rounded-lg"
+                    />
+                ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                        <User className="w-10 h-10 text-muted-foreground rounded-lg" />
+                    </div>
+                )}
+
+                {/* Hover overlay */}
+                <div className="w-10 h-10 absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg">
+                    <Camera className="w-4 h-4 text-white" />
+                </div>
+
+                {uploading && (
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    </div>
+                )}
+            </div>
+
+            <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                style={{ display: 'none' }}
+            />
+        </div>
+    )
+}
 
 export function LogoutButton() {
     const { signOut } = useClerk()
-    const { isSignedIn, user } = useUser()
+    const { isSignedIn } = useUser()
 
     const handleLogout = () => {
         signOut({ redirectUrl: '/' })
@@ -17,19 +90,16 @@ export function LogoutButton() {
     }
 
     return (
-        <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground">
-                Welcome, {user?.firstName || user?.emailAddresses[0]?.emailAddress}
-            </span>
-
+        <div className="flex items-center gap-3">
+            <ProfilePicture />
             <Button
                 variant="outline"
                 size="sm"
                 onClick={handleLogout}
-                className="flex items-center gap-2 cursor-pointer"
+                className="cursor-pointer p-2"
+                title="Logout"
             >
                 <LogOut className="w-4 h-4" />
-                Logout
             </Button>
         </div>
     )

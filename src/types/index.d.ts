@@ -47,3 +47,78 @@ export interface Particle {
     animationDelay: number
     animationDuration: number
 }
+
+export interface MediaItem {
+    id: string
+    type: 'video' | 'image'
+    title: string
+    url: string
+    publicId: string
+    createdAt: string
+    originalSize: number
+    width?: number
+    height?: number
+    duration?: number
+}
+
+export interface MediaLibraryProps {
+    media: MediaItem[]
+    onRefresh?: () => void
+    onDelete?: (id: string) => void
+}
+
+export interface SubscriptionData {
+    plan: {
+        name: string
+        storageLimit: number
+        transformationsLimit: number
+        priceEGP: number
+    }
+    usage: {
+        storageUsed: number
+        transformationsUsed: number
+        uploadsCount: number
+        storageRemaining: number
+        transformationsRemaining: number
+    }
+}
+
+export interface UsageAnalyticsProps {
+    subscription: SubscriptionData | null
+}
+
+export interface ProgressProps extends React.HTMLAttributes<HTMLDivElement> {
+    value?: number
+}
+
+// Toast Types
+export type ToastType = "success" | "error" | "warning" | "info"
+
+export interface Toast {
+    id: string
+    type: ToastType
+    title: string
+    description?: string
+    duration?: number
+}
+
+interface ToastContextType {
+    toasts: Toast[]
+    addToast: (toast: Omit<Toast, "id">) => void
+    removeToast: (id: string) => void
+}
+
+// api error response types
+export interface ApiResponse<T = unknown> {
+    success: boolean
+    data?: T
+    error?: string
+    message?: string
+    code?: string
+}
+
+export interface ApiError {
+    message: string
+    code?: string
+    details?: Record<string, unknown>
+}

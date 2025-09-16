@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
         }
 
         const uploadResponse = await uploadToCloudinary(buffer, {
-            folder: "SkyMedia-SaaS/profiles",
+            folder: "Sahab-SaaS/profiles",
             resourceType: "image",
             // Optimize for thumbnails
             eager: [

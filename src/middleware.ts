@@ -18,7 +18,8 @@ export default clerkMiddleware(async (auth, req) => {
     const pathname = url.pathname;
 
     const isApiRequest = pathname.startsWith('/api');
-    const isDashboard = pathname.startsWith('/dashboard');
+    // Check if this is a dashboard route that requires authentication
+    const isDashboard = pathname.startsWith('/dashboard')
 
     // Redirect logged-in users away from auth pages to dashboard
     if (userId && isPublicRoute(req) && (pathname.includes('/auth/') || pathname.includes('/sso-callback'))) {
@@ -29,7 +30,10 @@ export default clerkMiddleware(async (auth, req) => {
     if (!userId) {
         if (isApiRequest && !isPublicApiRoute(req)) {
             // For APIs, return 401 JSON instead of redirect
-            return new NextResponse('Unauthorized Request', { status: 401 });
+            return NextResponse.json(
+                { success: false, error: 'Unauthorized Request' },
+                { status: 401 }
+            );
         }
         if (isDashboard) {
             // Redirect unauthenticated users trying to access dashboard to sign-in

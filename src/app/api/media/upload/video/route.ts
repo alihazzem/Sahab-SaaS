@@ -1,24 +1,41 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import prisma from "@/lib/prisma";
 import { uploadToCloudinary } from "@/lib/uploadToCloudianry";
 import { isValidVideo } from "@/lib/validate";
 import { CloudinaryUploadResult } from "@/types";
+import {
+    createSuccessResponse,
+    ApiErrors,
+    logError,
+    validateFileSize,
+    validateFileType
+} from "@/lib/api-response";
 
 export async function POST(req: NextRequest) {
-    const { userId } = await auth();
-    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
     try {
+        const { userId } = await auth();
+        if (!userId) {
+            return ApiErrors.UNAUTHORIZED("Please sign in to upload videos");
+        }
+
         const formData = await req.formData();
         const file = formData.get("file") as File | null;
         const title = formData.get("title") as string | null;
         const description = formData.get("description") as string | null;
 
-        if (!file) return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
-        if (!title) return NextResponse.json({ error: "Title is required" }, { status: 400 });
-        if (!file.type.startsWith("video/"))
-            return NextResponse.json({ error: "Uploaded file is not a video" }, { status: 400 });
+        // Validate required fields
+        if (!file) {
+            return ApiErrors.BAD_REQUEST("No video file provided");
+        }
+        if (!title?.trim()) {
+            return ApiErrors.BAD_REQUEST("Video title is required");
+        }
+
+        // Validate file type
+        if (!validateFileType(file, ["video/"])) {
+            return ApiErrors.INVALID_FILE_TYPE(["MP4", "AVI", "MOV", "MKV", "WebM"]);
+        }
 
         // Get user's current subscription and plan
         const subscription = await prisma.subscription.findFirst({
@@ -31,15 +48,16 @@ export async function POST(req: NextRequest) {
         });
 
         if (!currentPlan) {
-            return NextResponse.json({ error: "No plan found" }, { status: 500 });
+            logError("Video Upload", new Error("No plan found for user"), userId);
+            return ApiErrors.INTERNAL_ERROR("Unable to determine user plan");
         }
 
-        // Check file size against plan limit
-        const maxFileSize = currentPlan.maxUploadSize * 1024 * 1024; // Convert MB to bytes
-        if (file.size > maxFileSize) {
-            return NextResponse.json({
-                error: `Video too large. Max ${currentPlan.maxUploadSize}MB for ${currentPlan.name} plan`
-            }, { status: 413 });
+        // Validate file size against plan limit
+        const maxSizeMB = currentPlan.maxUploadSize;
+        if (!validateFileSize(file, maxSizeMB)) {
+            return ApiErrors.FILE_TOO_LARGE(
+                `${maxSizeMB}MB (${currentPlan.name} plan limit)`
+            );
         }
 
         // Get or create current month usage
@@ -67,95 +85,128 @@ export async function POST(req: NextRequest) {
         // Check storage limit
         const storageLimit = currentPlan.storageLimit * 1024 * 1024; // Convert MB to bytes
         if (usage.storageUsed + file.size > storageLimit) {
-            return NextResponse.json({
-                error: `Storage limit exceeded. Used ${Math.round(usage.storageUsed / (1024 * 1024))}MB of ${currentPlan.storageLimit}MB. Upgrade your plan for more storage.`
-            }, { status: 413 });
+            const usedMB = Math.round(usage.storageUsed / (1024 * 1024));
+            return ApiErrors.QUOTA_EXCEEDED(
+                "Storage",
+                usedMB,
+                currentPlan.storageLimit
+            );
         }
 
         // Check transformations limit (video processing creates 3 versions)
         const transformationsNeeded = 3; // 1080p, 720p, 480p
-        if (usage.transformationsUsed + transformationsNeeded > currentPlan.transformationsLimit) {
-            return NextResponse.json({
-                error: `Transformation limit exceeded. Used ${usage.transformationsUsed} of ${currentPlan.transformationsLimit} transformations. Upgrade your plan for more transformations.`
-            }, { status: 413 });
+        const canProcessVideo = usage.transformationsUsed + transformationsNeeded <= currentPlan.transformationsLimit;
+
+        if (!canProcessVideo) {
+            console.log(`⚠️ Transformations exhausted. Uploading raw video only for user ${userId}`);
         }
 
         const bytes = await file.arrayBuffer();
         const buffer = Buffer.from(bytes);
 
-        if (!isValidVideo(buffer))
-            return NextResponse.json({ error: "Uploaded file is not a valid video" }, { status: 400 });
+        if (!isValidVideo(buffer)) {
+            return ApiErrors.VALIDATION_ERROR("Invalid video file format");
+        }
 
-        // Upload to Cloudinary with multiple resolutions, async
+        // Upload to Cloudinary with conditional processing
         const uploadResponse: CloudinaryUploadResult = await uploadToCloudinary(buffer, {
-            folder: "SkyMedia-SaaS/videos",
+            folder: "Sahab-SaaS/videos",
             resourceType: "video",
-            eager: [
-                { width: 1920, height: 1080, crop: "limit", format: "mp4", quality: "auto" },
-                { width: 1280, height: 720, crop: "limit", format: "mp4", quality: "auto" },
-                { width: 854, height: 480, crop: "limit", format: "mp4", quality: "auto" },
-            ],
-            eager_async: true, // async processing
+            ...(canProcessVideo && {
+                eager: [
+                    { width: 1920, height: 1080, crop: "limit", format: "mp4", quality: "auto" },
+                    { width: 1280, height: 720, crop: "limit", format: "mp4", quality: "auto" },
+                    { width: 854, height: 480, crop: "limit", format: "mp4", quality: "auto" },
+                ],
+                eager_async: true, // async processing
+            })
         });
 
-        // Create versions map
+        if (!uploadResponse?.secure_url) {
+            logError("Video Upload", new Error("Cloudinary upload failed"), userId);
+            return ApiErrors.UPLOAD_FAILED("Failed to upload to cloud storage");
+        }
+
+        // Create versions map (only if processing was done)
         const versions: Record<string, string> = {};
-        uploadResponse.eager?.forEach(v => {
-            if (!v.width || !v.secure_url) return;
-            if (v.width >= 1920) versions["1080p"] = v.secure_url;
-            else if (v.width >= 1280) versions["720p"] = v.secure_url;
-            else if (v.width >= 854) versions["480p"] = v.secure_url;
-        });
+        if (canProcessVideo && uploadResponse.eager) {
+            uploadResponse.eager.forEach(v => {
+                if (!v.width || !v.secure_url) return;
+                if (v.width >= 1920) versions["1080p"] = v.secure_url;
+                else if (v.width >= 1280) versions["720p"] = v.secure_url;
+                else if (v.width >= 854) versions["480p"] = v.secure_url;
+            });
+        }
 
         // Save metadata in Prisma
         const savedMedia = await prisma.media.create({
             data: {
                 userId,
                 type: "video",
-                title,
-                description,
+                title: title.trim(),
+                description: description?.trim() || null,
                 publicId: uploadResponse.public_id,
-                url: uploadResponse.secure_url!,
+                url: uploadResponse.secure_url,
                 versions,
                 originalSize: file.size,
                 compressedSize: uploadResponse.eager?.[0]?.bytes ?? null,
                 duration: Math.round(uploadResponse.duration ?? 0),
-                optimized: true,
+                optimized: canProcessVideo,
             },
         });
 
-        // Update usage tracking
+        // Update usage tracking (only count transformations if processing was done)
+        const transformationsUsed = canProcessVideo ? transformationsNeeded : 0;
         await prisma.usageTracking.update({
             where: { id: usage.id },
             data: {
                 storageUsed: usage.storageUsed + file.size,
-                transformationsUsed: usage.transformationsUsed + transformationsNeeded,
+                transformationsUsed: usage.transformationsUsed + transformationsUsed,
                 uploadsCount: usage.uploadsCount + 1
             }
         });
 
-        return NextResponse.json(
-            {
-                id: savedMedia.id,
-                title: savedMedia.title,
-                description: savedMedia.description,
-                publicId: savedMedia.publicId,
-                url: savedMedia.url,
-                originalSize: savedMedia.originalSize,
-                compressedSize: savedMedia.compressedSize,
-                duration: savedMedia.duration,
-                versions, // 1080p/720p/480p URLs
-                usage: {
-                    storageUsed: usage.storageUsed + file.size,
-                    storageLimit: storageLimit,
-                    transformationsUsed: usage.transformationsUsed + transformationsNeeded,
-                    transformationsLimit: currentPlan.transformationsLimit
-                }
-            },
-            { status: 200 }
-        );
+        const responseData = {
+            id: savedMedia.id,
+            title: savedMedia.title,
+            description: savedMedia.description,
+            publicId: savedMedia.publicId,
+            url: savedMedia.url,
+            originalSize: savedMedia.originalSize,
+            compressedSize: savedMedia.compressedSize,
+            duration: savedMedia.duration,
+            versions, // 1080p/720p/480p URLs (empty if no processing)
+            optimized: canProcessVideo,
+            processingNote: canProcessVideo ?
+                "Video processed with multiple resolutions" :
+                "Raw upload only - transformation limits exceeded",
+            usage: {
+                storageUsed: usage.storageUsed + file.size,
+                storageLimit: storageLimit,
+                transformationsUsed: usage.transformationsUsed + transformationsUsed,
+                transformationsLimit: currentPlan.transformationsLimit
+            }
+        };
+
+        const successMessage = canProcessVideo ?
+            "Video uploaded and optimized successfully!" :
+            "Video uploaded successfully (processing skipped due to plan limits)";
+
+        return createSuccessResponse(responseData, successMessage);
+
     } catch (error) {
-        console.error("Video upload error:", error);
-        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+        logError("Video Upload API", error, "unknown");
+
+        if (error instanceof Error) {
+            // Handle specific error types
+            if (error.message.includes("File too large")) {
+                return ApiErrors.FILE_TOO_LARGE("100MB");
+            }
+            if (error.message.includes("quota") || error.message.includes("limit")) {
+                return ApiErrors.QUOTA_EXCEEDED("Upload", 0, 0);
+            }
+        }
+
+        return ApiErrors.INTERNAL_ERROR("Failed to upload video. Please try again.");
     }
 }

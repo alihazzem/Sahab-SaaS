@@ -1,0 +1,331 @@
+"use client"
+
+import { useState } from 'react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import {
+    Video,
+    ImageIcon,
+    Download,
+    ExternalLink,
+    Search,
+    Filter,
+    Upload,
+    Loader2,
+    Grid3X3,
+    List,
+    Eye,
+    Calendar,
+    FileText,
+    Sparkles,
+    FolderOpen
+} from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { MediaItemSkeleton } from '@/components/ui/loading'
+import type { MediaLibraryProps } from '@/types'
+
+export function MediaLibrary({ media, onRefresh, loading = false }: MediaLibraryProps & { loading?: boolean }) {
+    const [searchTerm, setSearchTerm] = useState('')
+    const [filterType, setFilterType] = useState<'all' | 'video' | 'image'>('all')
+    const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+
+    // Ensure media is always an array
+    const mediaArray = Array.isArray(media) ? media : []
+
+    const filteredMedia = mediaArray.filter(item => {
+        const matchesSearch = item.title.toLowerCase().includes(searchTerm.toLowerCase())
+        const matchesFilter = filterType === 'all' || item.type === filterType
+        return matchesSearch && matchesFilter
+    })
+
+    const formatFileSize = (bytes: number) => {
+        return (bytes / (1024 * 1024)).toFixed(2) + ' MB'
+    }
+
+    const formatDate = (dateString: string) => {
+        return new Date(dateString).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+        })
+    }
+
+    const handleDownload = (url: string, title: string) => {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = title
+        link.click()
+    }
+
+    const handleView = (url: string) => {
+        window.open(url, '_blank')
+    }
+
+    if (mediaArray.length === 0 && !loading) {
+        return (
+            <Card className="border-dashed border-2 border-border hover:border-primary/50 transition-colors">
+                <CardHeader className="text-center pb-2">
+                    <CardTitle className="flex items-center justify-center gap-2">
+                        <FolderOpen className="h-5 w-5" />
+                        Media Library
+                    </CardTitle>
+                    <CardDescription>
+                        Your uploaded files will appear here
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="flex flex-col items-center justify-center py-8 sm:py-12 text-center px-4">
+                        <div className="relative mb-6">
+                            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-primary/10 rounded-full flex items-center justify-center">
+                                <Upload className="h-8 w-8 sm:h-10 sm:w-10 text-primary" />
+                            </div>
+                            <div className="absolute -top-1 -right-1 w-5 h-5 sm:w-6 sm:h-6 bg-primary rounded-full flex items-center justify-center">
+                                <Sparkles className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-primary-foreground" />
+                            </div>
+                        </div>
+                        <h3 className="text-lg sm:text-xl font-semibold mb-2">No media files yet</h3>
+                        <p className="text-muted-foreground mb-6 max-w-sm text-sm sm:text-base">
+                            Start building your media library by uploading your first video or image.
+                            All your files will be optimized automatically.
+                        </p>
+                        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                            <Button onClick={onRefresh} className="bg-primary hover:bg-primary/90 cursor-pointer">
+                                <Upload className="h-4 w-4 mr-2" />
+                                Upload First File
+                            </Button>
+                            <Button variant="outline" onClick={onRefresh} className="cursor-pointer">
+                                <FileText className="h-4 w-4 mr-2" />
+                                Learn More
+                            </Button>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+        )
+    }
+
+    return (
+        <Card className="overflow-hidden bg-gradient-to-br from-card to-card/50">
+            <CardHeader className="bg-muted/30 py-5 px-4 sm:px-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                        <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                            <FolderOpen className="h-5 w-5 text-primary flex-shrink-0" />
+                            <span className="truncate">Media Library</span>
+                            {!loading && (
+                                <Badge variant="outline" className="text-xs flex-shrink-0">
+                                    {filteredMedia.length} of {mediaArray.length} files
+                                </Badge>
+                            )}
+                        </CardTitle>
+                        <CardDescription className="mt-1 text-sm">
+                            {loading ? 'Loading your media files...' : 'Manage and organize your uploaded content'}
+                        </CardDescription>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                        {/* View Toggle */}
+                        <div className="flex items-center bg-muted rounded-lg p-1">
+                            <Button
+                                variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                                size="sm"
+                                onClick={() => setViewMode('grid')}
+                                className="h-8 w-8 p-0 cursor-pointer"
+                            >
+                                <Grid3X3 className="h-4 w-4" />
+                            </Button>
+                            <Button
+                                variant={viewMode === 'list' ? 'default' : 'ghost'}
+                                size="sm"
+                                onClick={() => setViewMode('list')}
+                                className="h-8 w-8 p-0 cursor-pointer"
+                            >
+                                <List className="h-4 w-4" />
+                            </Button>
+                        </div>
+
+                        {/* Refresh Button */}
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={onRefresh}
+                            disabled={loading}
+                            className="cursor-pointer hover:bg-primary/10"
+                        >
+                            {loading ? (
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            ) : (
+                                <Upload className="h-4 w-4 mr-2" />
+                            )}
+                            {loading ? 'Loading...' : 'Refresh'}
+                        </Button>
+                    </div>
+                </div>
+
+                {/* Search and Filter Controls */}
+                {!loading && (
+                    <div className="flex flex-col sm:flex-row gap-3 pt-4">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Search files by name..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="pl-10 bg-background/50"
+                            />
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            <Button
+                                variant={filterType === 'all' ? 'default' : 'outline'}
+                                size="sm"
+                                onClick={() => setFilterType('all')}
+                                className="cursor-pointer text-xs sm:text-sm"
+                            >
+                                All Files
+                            </Button>
+                            <Button
+                                variant={filterType === 'video' ? 'default' : 'outline'}
+                                size="sm"
+                                onClick={() => setFilterType('video')}
+                                className="cursor-pointer text-xs sm:text-sm"
+                            >
+                                <Video className="h-3 w-3 mr-1" />
+                                <span className="hidden xs:inline">Videos</span>
+                                <span className="xs:hidden">Video</span>
+                            </Button>
+                            <Button
+                                variant={filterType === 'image' ? 'default' : 'outline'}
+                                size="sm"
+                                onClick={() => setFilterType('image')}
+                                className="cursor-pointer text-xs sm:text-sm"
+                            >
+                                <ImageIcon className="h-3 w-3 mr-1" />
+                                <span className="hidden xs:inline">Images</span>
+                                <span className="xs:hidden">Image</span>
+                            </Button>
+                        </div>
+                    </div>
+                )}
+            </CardHeader>
+
+            <CardContent className="p-4 sm:p-6">
+                {loading ? (
+                    <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                        {Array.from({ length: 6 }).map((_, index) => (
+                            <MediaItemSkeleton key={index} />
+                        ))}
+                    </div>
+                ) : (
+                    <div className={viewMode === 'grid' ? 'grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' : 'space-y-3'}>
+                        {filteredMedia.map((item) => (
+                            <div
+                                key={item.id}
+                                className={`group border border-border rounded-xl p-3 sm:p-4 lg:p-5 hover:bg-accent/30 hover:border-primary/30 hover:shadow-lg transition-all duration-300 ${viewMode === 'list' ? 'flex flex-col gap-3' : ''
+                                    }`}
+                            >
+                                {/* File header */}
+                                <div className={`flex items-start justify-between ${viewMode === 'list' ? 'flex-1' : 'mb-3'}`}>
+                                    <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
+                                        <div className={`p-1.5 sm:p-2 rounded-lg flex-shrink-0 ${item.type === 'video' ? 'bg-blue-500/10' : 'bg-green-500/10'}`}>
+                                            {item.type === 'video' ? (
+                                                <Video className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 text-blue-500" />
+                                            ) : (
+                                                <ImageIcon className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 text-green-500" />
+                                            )}
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <h4 className="font-semibold truncate text-xs sm:text-sm group-hover:text-primary transition-colors" title={item.title || 'Untitled'}>
+                                                {item.title || 'Untitled'}
+                                            </h4>
+                                            <div className="flex flex-col xs:flex-row xs:items-center gap-1 mt-1">
+                                                <Badge variant="secondary" className="text-xs self-start">
+                                                    {item.type}
+                                                </Badge>
+                                                <span className="text-xs text-muted-foreground">
+                                                    {formatFileSize(item.originalSize)}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {viewMode === 'grid' && (
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => handleView(item.url)}
+                                            className="opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer flex-shrink-0 hidden sm:flex"
+                                        >
+                                            <Eye className="h-4 w-4" />
+                                        </Button>
+                                    )}
+                                </div>
+
+                                {/* File details */}
+                                {viewMode === 'grid' && (
+                                    <div className="space-y-1 sm:space-y-2 text-xs text-muted-foreground mb-3 sm:mb-4">
+                                        {item.type === 'video' && item.duration && (
+                                            <div className="flex items-center gap-1">
+                                                <Video className="h-3 w-3 flex-shrink-0" />
+                                                <span className="truncate">Duration: {item.duration}s</span>
+                                            </div>
+                                        )}
+                                        {item.width && item.height && (
+                                            <div className="flex items-center gap-1">
+                                                <ImageIcon className="h-3 w-3 flex-shrink-0" />
+                                                <span className="truncate">{item.width} × {item.height}</span>
+                                            </div>
+                                        )}
+                                        <div className="flex items-center gap-1">
+                                            <Calendar className="h-3 w-3 flex-shrink-0" />
+                                            <span className="truncate">{formatDate(item.createdAt)}</span>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Actions */}
+                                <div className={`flex gap-1.5 sm:gap-2 ${viewMode === 'list' ? 'ml-auto' : ''}`}>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handleView(item.url)}
+                                        className="flex-1 cursor-pointer hover:bg-primary/10 hover:border-primary/30 text-xs sm:text-sm px-2 sm:px-3"
+                                    >
+                                        <ExternalLink className="h-3 w-3 mr-1" />
+                                        <span className="">View</span>
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handleDownload(item.url, item.title || 'download')}
+                                        className="flex-1 cursor-pointer hover:bg-primary/10 hover:border-primary/30 text-xs sm:text-sm px-2 sm:px-3"
+                                    >
+                                        <Download className="h-3 w-3 mr-1" />
+                                        <span className="">Download</span>
+                                    </Button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* No results state */}
+                {!loading && filteredMedia.length === 0 && mediaArray.length > 0 && (
+                    <div className="text-center py-8 sm:py-12 px-4">
+                        <div className="w-12 h-12 sm:w-16 sm:h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+                            <Filter className="h-6 w-6 sm:h-8 sm:w-8 text-muted-foreground" />
+                        </div>
+                        <h3 className="text-base sm:text-lg font-medium mb-2">No files found</h3>
+                        <p className="text-muted-foreground mb-4 text-sm sm:text-base">
+                            Try adjusting your search terms or filters
+                        </p>
+                        <Button variant="outline" onClick={() => {
+                            setSearchTerm('')
+                            setFilterType('all')
+                        }} className="cursor-pointer">
+                            Clear Filters
+                        </Button>
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+    )
+}

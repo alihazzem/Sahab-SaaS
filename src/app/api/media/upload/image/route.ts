@@ -1,42 +1,65 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { uploadToCloudinary } from "@/lib/uploadToCloudianry";
 import { isValidImageStrict } from "@/lib/validate";
 import prisma from "@/lib/prisma";
+import {
+    createSuccessResponse,
+    ApiErrors,
+    logError,
+    validateFileSize,
+    validateFileType
+} from "@/lib/api-response";
 
-const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB for supporting images
+const MAX_IMAGE_SIZE_MB = 5; // 5MB for supporting images
 
 export async function POST(req: NextRequest) {
-    const { userId } = await auth();
-    if (!userId) {
-        return NextResponse.json({ error: "Unauthorized Request" }, { status: 401 });
-    }
-
     try {
-        const formData = await req.formData();
-        const file = formData.get("file") as File | null;
-
-        if (!file) {
-            return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
+        const { userId } = await auth();
+        if (!userId) {
+            return ApiErrors.UNAUTHORIZED("Please sign in to upload images");
         }
 
-        // Simple size check for supporting images (no plan verification needed)
-        if (file.size > MAX_IMAGE_SIZE) {
-            return NextResponse.json({ error: "Image too large. Max 5MB" }, { status: 413 });
+        const formData = await req.formData();
+        const file = formData.get("file") as File | null;
+        const title = formData.get("title") as string | null;
+        const description = formData.get("description") as string | null;
+
+        // Validate required fields
+        if (!file) {
+            return ApiErrors.BAD_REQUEST("No image file provided");
+        }
+        if (!title?.trim()) {
+            return ApiErrors.BAD_REQUEST("Image title is required");
+        }
+
+        // Validate file type
+        if (!validateFileType(file, ["image/"])) {
+            return ApiErrors.INVALID_FILE_TYPE(["JPEG", "PNG", "WebP", "GIF"]);
+        }
+
+        // Validate file size (5MB limit for images)
+        if (!validateFileSize(file, MAX_IMAGE_SIZE_MB)) {
+            return ApiErrors.FILE_TOO_LARGE(`${MAX_IMAGE_SIZE_MB}MB`);
         }
 
         const bytes = await file.arrayBuffer();
         const buffer = Buffer.from(bytes);
 
         if (!(await isValidImageStrict(buffer))) {
-            return NextResponse.json({ error: "Uploaded file is not a valid image" }, { status: 400 });
+            return ApiErrors.VALIDATION_ERROR("Invalid image file format");
         }
 
         // Upload to Cloudinary
         const uploadResponse = await uploadToCloudinary(buffer, {
-            folder: "SkyMedia-SaaS/images",
+            folder: "Sahab-SaaS/images",
             resourceType: "image",
         });
+
+        if (!uploadResponse?.secure_url) {
+            logError("Image Upload", new Error("Cloudinary upload failed"), userId);
+            return ApiErrors.UPLOAD_FAILED("Failed to upload to cloud storage");
+        }
 
         // Extract width and height from response if available
         const width: number | null = typeof uploadResponse.width === "number" ? uploadResponse.width : null;
@@ -47,10 +70,10 @@ export async function POST(req: NextRequest) {
             data: {
                 userId,
                 type: "image",
-                title: file.name || "Untitled Image",
-                description: null,
+                title: title.trim(),
+                description: description?.trim() || null,
                 publicId: uploadResponse.public_id,
-                url: uploadResponse.secure_url || "",
+                url: uploadResponse.secure_url,
                 originalSize: file.size,
                 compressedSize: uploadResponse.bytes || file.size,
                 duration: null,
@@ -63,17 +86,33 @@ export async function POST(req: NextRequest) {
 
         console.log(`✅ Image saved to database with ID: ${savedMedia.id}`);
 
-        return NextResponse.json({
+        const responseData = {
             id: savedMedia.id,
+            title: savedMedia.title,
+            description: savedMedia.description,
             publicId: uploadResponse.public_id,
-            url: uploadResponse.secure_url ?? "",
+            url: uploadResponse.secure_url,
             width,
             height,
             originalSize: file.size,
-        }, { status: 200 });
+            compressedSize: uploadResponse.bytes || file.size,
+        };
+
+        return createSuccessResponse(responseData, "Image uploaded successfully!");
 
     } catch (error) {
-        console.error("Image upload error:", error);
-        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+        logError("Image Upload API", error, "unknown");
+
+        if (error instanceof Error) {
+            // Handle specific error types
+            if (error.message.includes("File too large")) {
+                return ApiErrors.FILE_TOO_LARGE("5MB");
+            }
+            if (error.message.includes("Invalid image")) {
+                return ApiErrors.VALIDATION_ERROR("Invalid image format");
+            }
+        }
+
+        return ApiErrors.INTERNAL_ERROR("Failed to upload image. Please try again.");
     }
 }

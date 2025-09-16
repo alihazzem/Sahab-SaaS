@@ -2,19 +2,20 @@
 
 import type React from "react"
 
-import { useState } from "react"
-import { useSignUp } from "@clerk/nextjs"
+import { useState, useEffect } from "react"
+import { useSignUp, useAuth } from "@clerk/nextjs"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Eye, EyeOff, Github } from "lucide-react"
+import { Eye, EyeOff, Github, Loader2 } from "lucide-react"
 import Link from "next/link"
 
 export default function SignUpPage() {
     const { isLoaded, signUp, setActive } = useSignUp()
+    const { isLoaded: authLoaded, isSignedIn } = useAuth()
     const [firstName, setFirstName] = useState("")
     const [lastName, setLastName] = useState("")
     const [email, setEmail] = useState("")
@@ -25,6 +26,27 @@ export default function SignUpPage() {
     const [verifying, setVerifying] = useState(false)
     const [code, setCode] = useState("")
     const router = useRouter()
+
+    // Redirect if already signed in
+    useEffect(() => {
+        if (authLoaded && isSignedIn) {
+            router.push('/dashboard')
+        }
+    }, [authLoaded, isSignedIn, router])
+
+    // Show loading spinner while auth is loading
+    if (!authLoaded) {
+        return (
+            <div className="min-h-screen bg-background flex items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+        )
+    }
+
+    // Don't render form if already signed in (redirect is handled above)
+    if (isSignedIn) {
+        return null
+    }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
