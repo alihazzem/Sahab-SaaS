@@ -122,3 +122,23 @@ export interface ApiError {
     code?: string
     details?: Record<string, unknown>
 }
+
+
+export type PlanType = 'FREE' | 'PRO' | 'ENTERPRISE'
+
+export interface ClientUsageValidation {
+    isValid: boolean
+    error?: string
+    warning?: string
+}
+
+export interface StorageInfo {
+    current: number
+    limit: number
+    available: number
+}
+
+export interface PlanLimits {
+    maxFileSize: number // in bytes
+    storage: number // in bytes
+}

@@ -1,17 +1,27 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Video, ImageIcon, X, Loader2, AlertTriangle, Info } from 'lucide-react'
+import { Video, ImageIcon, X, Loader2, AlertTriangle, Info, Minimize2 } from 'lucide-react'
+import {
+    validateFileSize,
+    validateStorageCapacity,
+    fetchStorageInfo,
+    fetchUserPlan,
+    formatFileSize,
+} from '@/lib/client-usage'
+
+import type { StorageInfo, ClientUsageValidation } from '@/types'
 
 interface UploadModalProps {
     isOpen: boolean
     onClose: () => void
     type: 'video' | 'image'
     onUpload: (file: File, title: string, description?: string) => Promise<void>
+    onMinimize?: () => void
     uploading: boolean
     transformationsRemaining?: number
     transformationsLimit?: number
@@ -22,12 +32,67 @@ export function UploadModal({
     onClose,
     type,
     onUpload,
+    onMinimize,
     uploading,
     transformationsRemaining = 999,
 }: UploadModalProps) {
     const [title, setTitle] = useState('')
     const [description, setDescription] = useState('')
     const [selectedFile, setSelectedFile] = useState<File | null>(null)
+    const [userPlan, setUserPlan] = useState<string>('FREE')
+    const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(null)
+    const [validationError, setValidationError] = useState<string>('')
+    const [validationWarning, setValidationWarning] = useState<string>('')
+    const [loadingQuota, setLoadingQuota] = useState(false)
+
+    // Load user quota information when modal opens
+    useEffect(() => {
+        if (isOpen) {
+            loadQuotaInfo()
+        }
+    }, [isOpen])
+
+    const loadQuotaInfo = async () => {
+        setLoadingQuota(true)
+        try {
+            const [plan, storage] = await Promise.all([
+                fetchUserPlan(),
+                fetchStorageInfo()
+            ])
+            setUserPlan(plan)
+            setStorageInfo(storage)
+        } catch (error) {
+            console.error('Failed to load quota info:', error)
+        } finally {
+            setLoadingQuota(false)
+        }
+    }
+
+    const validateFile = (file: File): ClientUsageValidation => {
+        // Check file size against plan limits
+        const sizeValidation = validateFileSize(file, userPlan)
+        if (!sizeValidation.isValid) {
+            return sizeValidation
+        }
+
+        // Check storage capacity
+        if (storageInfo) {
+            const storageValidation = validateStorageCapacity(file.size, storageInfo)
+            if (!storageValidation.isValid) {
+                return storageValidation
+            }
+
+            // Return warning if exists (from either validation)
+            if (sizeValidation.warning || storageValidation.warning) {
+                return {
+                    isValid: true,
+                    warning: sizeValidation.warning || storageValidation.warning
+                }
+            }
+        }
+
+        return { isValid: true }
+    }
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
@@ -36,6 +101,19 @@ export function UploadModal({
             // Auto-fill title with filename (without extension)
             const nameWithoutExt = file.name.split('.').slice(0, -1).join('.')
             setTitle(nameWithoutExt)
+
+            // Validate the selected file
+            const validation = validateFile(file)
+            if (!validation.isValid) {
+                setValidationError(validation.error || '')
+                setValidationWarning('')
+            } else {
+                setValidationError('')
+                setValidationWarning(validation.warning || '')
+            }
+        } else {
+            setValidationError('')
+            setValidationWarning('')
         }
     }
 
@@ -55,6 +133,8 @@ export function UploadModal({
         setTitle('')
         setDescription('')
         setSelectedFile(null)
+        setValidationError('')
+        setValidationWarning('')
         onClose()
     }
 
@@ -77,15 +157,28 @@ export function UploadModal({
                                 </CardDescription>
                             </div>
                         </div>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={handleClose}
-                            disabled={uploading}
-                            className="cursor-pointer"
-                        >
-                            <X className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center gap-1">
+                            {onMinimize && uploading && (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={onMinimize}
+                                    className="cursor-pointer"
+                                    title="Minimize and continue upload in background"
+                                >
+                                    <Minimize2 className="h-4 w-4" />
+                                </Button>
+                            )}
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleClose}
+                                disabled={uploading}
+                                className="cursor-pointer"
+                            >
+                                <X className="h-4 w-4" />
+                            </Button>
+                        </div>
                     </div>
                 </CardHeader>
 
@@ -138,13 +231,56 @@ export function UploadModal({
                                 onChange={handleFileSelect}
                                 disabled={uploading}
                                 required
+                                className='cursor-pointer'
                             />
                             {selectedFile && (
                                 <p className="text-sm text-muted-foreground">
-                                    Selected: {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+                                    Selected: {selectedFile.name} ({formatFileSize(selectedFile.size)})
                                 </p>
                             )}
                         </div>
+
+                        {/* Quota Information */}
+                        {storageInfo && (
+                            <div className="space-y-2">
+                                <div className="text-sm text-muted-foreground">
+                                    <div className="flex justify-between">
+                                        <span>Storage Usage:</span>
+                                        <span>{formatFileSize(storageInfo.current)} / {formatFileSize(storageInfo.limit)}</span>
+                                    </div>
+                                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mt-1">
+                                        <div
+                                            className="bg-primary h-2 rounded-full transition-all duration-300"
+                                            style={{ width: `${Math.min((storageInfo.current / storageInfo.limit) * 100, 100)}%` }}
+                                        />
+                                    </div>
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                    Plan: {userPlan} • Available: {formatFileSize(storageInfo.available)}
+                                </p>
+                            </div>
+                        )}
+
+                        {/* Validation Messages */}
+                        {validationError && (
+                            <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg">
+                                <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+                                <div className="text-sm">
+                                    <p className="font-medium text-red-800 dark:text-red-200">Upload Error</p>
+                                    <p className="text-red-700 dark:text-red-300">{validationError}</p>
+                                </div>
+                            </div>
+                        )}
+
+                        {validationWarning && !validationError && (
+                            <div className="flex items-start gap-2 p-3 bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 rounded-lg">
+                                <Info className="h-4 w-4 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
+                                <div className="text-sm">
+                                    <p className="font-medium text-orange-800 dark:text-orange-200">Warning</p>
+                                    <p className="text-orange-700 dark:text-orange-300">{validationWarning}</p>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Title */}
                         <div className="space-y-2">
@@ -184,13 +320,18 @@ export function UploadModal({
                             </Button>
                             <Button
                                 type="submit"
-                                disabled={!selectedFile || !title.trim() || uploading}
+                                disabled={!selectedFile || !title.trim() || uploading || !!validationError || loadingQuota}
                                 className="flex-1 cursor-pointer"
                             >
                                 {uploading ? (
                                     <>
                                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                                         Uploading...
+                                    </>
+                                ) : loadingQuota ? (
+                                    <>
+                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                        Checking quota...
                                     </>
                                 ) : (
                                     `Upload ${type === 'video' ? 'Video' : 'Image'}`

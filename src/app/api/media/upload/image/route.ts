@@ -7,11 +7,13 @@ import {
     createSuccessResponse,
     ApiErrors,
     logError,
-    validateFileSize,
     validateFileType
 } from "@/lib/api-response";
+import {
+    checkStorageLimit,
+    checkFileSizeLimit
+} from "@/lib/usage-limits";
 
-const MAX_IMAGE_SIZE_MB = 5; // 5MB for supporting images
 
 export async function POST(req: NextRequest) {
     try {
@@ -38,9 +40,20 @@ export async function POST(req: NextRequest) {
             return ApiErrors.INVALID_FILE_TYPE(["JPEG", "PNG", "WebP", "GIF"]);
         }
 
-        // Validate file size (5MB limit for images)
-        if (!validateFileSize(file, MAX_IMAGE_SIZE_MB)) {
-            return ApiErrors.FILE_TOO_LARGE(`${MAX_IMAGE_SIZE_MB}MB`);
+        // Check file size limit based on user's plan
+        const fileSizeCheck = await checkFileSizeLimit(userId, file.size);
+        if (!fileSizeCheck.isValid) {
+            return ApiErrors.FILE_TOO_LARGE(fileSizeCheck.reason || "File too large for your plan");
+        }
+
+        // Check storage limit before upload
+        const storageCheck = await checkStorageLimit(userId, file.size);
+        if (!storageCheck.canUpload) {
+            return ApiErrors.QUOTA_EXCEEDED(
+                "Storage",
+                Math.round(storageCheck.usage?.current || 0),
+                Math.round(storageCheck.usage?.limit || 0)
+            );
         }
 
         const bytes = await file.arrayBuffer();

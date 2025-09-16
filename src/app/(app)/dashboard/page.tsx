@@ -21,6 +21,9 @@ import {
 import { UsageAnalytics } from '@/components/dashboard/usage-analytics'
 import { MediaLibrary } from '@/components/dashboard/media-library'
 import { UploadModal } from '@/components/dashboard/upload-modal'
+import { UploadProgressTracker } from '@/components/dashboard/upload-progress-tracker'
+import { UploadStatusIndicator } from '@/components/dashboard/upload-status-indicator'
+import { useBackgroundUpload } from '@/hooks/useBackgroundUpload'
 import { useToast } from '@/components/ui/toast'
 import type { MediaItem, SubscriptionData } from '@/types'
 
@@ -33,8 +36,34 @@ export default function DashboardPage() {
     const [uploading, setUploading] = useState(false)
     const [uploadModalOpen, setUploadModalOpen] = useState(false)
     const [uploadType, setUploadType] = useState<'video' | 'image'>('video')
+    const [progressTrackerMinimized, setProgressTrackerMinimized] = useState(false)
 
     const { success, error } = useToast()
+
+    // Background upload system
+    const {
+        tasks: uploadTasks,
+        startUpload,
+        removeTask,
+        clearCompleted
+    } = useBackgroundUpload(
+        (result) => {
+            // Handle successful upload
+            if (result && typeof result === 'object' && 'data' in result) {
+                const uploadResult = result as { data: MediaItem, subscription?: SubscriptionData }
+                if (uploadResult.data) {
+                    setMedia(prev => [uploadResult.data, ...prev])
+                }
+                if (uploadResult.subscription) {
+                    setSubscription(uploadResult.subscription)
+                }
+            }
+        },
+        (errorMessage) => {
+            // Handle upload error
+            error('Upload failed', errorMessage)
+        }
+    )
 
     const loadData = useCallback(async (retryCount = 0) => {
         setLoading(true)
@@ -171,40 +200,23 @@ export default function DashboardPage() {
         setUploading(true)
 
         try {
-            const formData = new FormData()
-            formData.append('file', file)
-            formData.append('title', title)
-            if (description) formData.append('description', description)
+            // Start background upload
+            await startUpload(file, title, description, uploadType)
 
-            const endpoint = uploadType === 'video' ? '/api/media/upload/video' : '/api/media/upload/image'
-
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                body: formData,
-            })
-
-            const result = await response.json()
-
-            if (result.success) {
-                success('Upload successful!', `Your ${uploadType} has been uploaded successfully.`)
-                if (result.data) {
-                    setMedia(prev => [result.data, ...prev])
-
-                    // Update subscription state if provided
-                    if (result.subscription) {
-                        setSubscription(result.subscription)
-                    }
-                }
-                setUploadModalOpen(false)
-            } else {
-                error('Upload failed', result.error || 'There was an error uploading your file.')
-            }
+            // Show success message and close modal
+            success('Upload started!', `Your ${uploadType} is uploading in the background.`)
+            setUploadModalOpen(false)
         } catch (err) {
             console.error('Upload error:', err)
-            error('Upload failed', 'There was an error uploading your file. Please try again.')
+            // Error is already handled by the background upload system
         } finally {
             setUploading(false)
         }
+    }
+
+    const handleMinimizeUpload = () => {
+        setUploadModalOpen(false)
+        setProgressTrackerMinimized(false) // Show the progress tracker
     }
 
     const handleDelete = async (id: string) => {
@@ -250,6 +262,9 @@ export default function DashboardPage() {
 
                         {/* Profile & Logout */}
                         <div className="flex items-center gap-3">
+                            <UploadStatusIndicator
+                                activeUploads={uploadTasks.filter(task => task.status === 'uploading').length}
+                            />
                             <LogoutButton />
                         </div>
                     </div>
@@ -346,7 +361,10 @@ export default function DashboardPage() {
 
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                                 {/* Video Upload Card */}
-                                <Card className="group border-border hover:border-primary/50 hover:shadow-lg transition-all duration-300 cursor-pointer bg-gradient-to-br from-card to-card/50"
+                                <Card className={`group border-border hover:border-primary/50 hover:shadow-lg transition-all duration-300 cursor-pointer bg-gradient-to-br from-card to-card/50 ${uploadTasks.some(task => task.type === 'video' && task.status === 'uploading')
+                                        ? 'ring-2 ring-blue-500/20 bg-blue-50/5'
+                                        : ''
+                                    }`}
                                     onClick={handleVideoUpload}>
                                     <CardHeader className="pb-3">
                                         <div className="flex items-center justify-between">
@@ -385,7 +403,10 @@ export default function DashboardPage() {
                                 </Card>
 
                                 {/* Image Upload Card */}
-                                <Card className="group border-border hover:border-primary/50 hover:shadow-lg transition-all duration-300 cursor-pointer bg-gradient-to-br from-card to-card/50"
+                                <Card className={`group border-border hover:border-primary/50 hover:shadow-lg transition-all duration-300 cursor-pointer bg-gradient-to-br from-card to-card/50 ${uploadTasks.some(task => task.type === 'image' && task.status === 'uploading')
+                                        ? 'ring-2 ring-green-500/20 bg-green-50/5'
+                                        : ''
+                                    }`}
                                     onClick={handleImageUpload}>
                                     <CardHeader className="pb-3">
                                         <div className="flex items-center justify-between">
@@ -468,8 +489,18 @@ export default function DashboardPage() {
                 isOpen={uploadModalOpen}
                 onClose={() => setUploadModalOpen(false)}
                 onUpload={handleUpload}
+                onMinimize={handleMinimizeUpload}
                 uploading={uploading}
                 type={uploadType}
+            />
+
+            {/* Background Upload Progress Tracker */}
+            <UploadProgressTracker
+                tasks={uploadTasks}
+                isMinimized={progressTrackerMinimized}
+                onToggleMinimize={() => setProgressTrackerMinimized(!progressTrackerMinimized)}
+                onRemoveTask={removeTask}
+                onClearCompleted={clearCompleted}
             />
         </div>
     )

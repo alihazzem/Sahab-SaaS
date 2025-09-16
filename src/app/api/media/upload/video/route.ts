@@ -8,9 +8,13 @@ import {
     createSuccessResponse,
     ApiErrors,
     logError,
-    validateFileSize,
     validateFileType
 } from "@/lib/api-response";
+import {
+    checkStorageLimit,
+    checkFileSizeLimit,
+    checkTransformationLimit
+} from "@/lib/usage-limits";
 
 export async function POST(req: NextRequest) {
     try {
@@ -37,30 +41,27 @@ export async function POST(req: NextRequest) {
             return ApiErrors.INVALID_FILE_TYPE(["MP4", "AVI", "MOV", "MKV", "WebM"]);
         }
 
-        // Get user's current subscription and plan
-        const subscription = await prisma.subscription.findFirst({
-            where: { userId, status: 'ACTIVE' },
-            include: { plan: true }
-        });
-
-        const currentPlan = subscription?.plan || await prisma.plan.findFirst({
-            where: { name: 'Free' }
-        });
-
-        if (!currentPlan) {
-            logError("Video Upload", new Error("No plan found for user"), userId);
-            return ApiErrors.INTERNAL_ERROR("Unable to determine user plan");
+        // Check file size limit based on user's plan
+        const fileSizeCheck = await checkFileSizeLimit(userId, file.size);
+        if (!fileSizeCheck.isValid) {
+            return ApiErrors.FILE_TOO_LARGE(fileSizeCheck.reason || "File too large for your plan");
         }
 
-        // Validate file size against plan limit
-        const maxSizeMB = currentPlan.maxUploadSize;
-        if (!validateFileSize(file, maxSizeMB)) {
-            return ApiErrors.FILE_TOO_LARGE(
-                `${maxSizeMB}MB (${currentPlan.name} plan limit)`
+        // Check storage limit before upload
+        const storageCheck = await checkStorageLimit(userId, file.size);
+        if (!storageCheck.canUpload) {
+            return ApiErrors.QUOTA_EXCEEDED(
+                "Storage",
+                Math.round(storageCheck.usage?.current || 0),
+                Math.round(storageCheck.usage?.limit || 0)
             );
         }
 
-        // Get or create current month usage
+        // Check transformation limits for video processing
+        const transformationCheck = await checkTransformationLimit(userId, 3);
+        const canProcessVideo = transformationCheck.canProcess;
+
+        // Create usage tracking entry if needed (for now, we'll use current storage usage)
         const currentDate = new Date();
         const currentMonth = currentDate.getMonth() + 1;
         const currentYear = currentDate.getFullYear();
@@ -81,21 +82,6 @@ export async function POST(req: NextRequest) {
                 }
             });
         }
-
-        // Check storage limit
-        const storageLimit = currentPlan.storageLimit * 1024 * 1024; // Convert MB to bytes
-        if (usage.storageUsed + file.size > storageLimit) {
-            const usedMB = Math.round(usage.storageUsed / (1024 * 1024));
-            return ApiErrors.QUOTA_EXCEEDED(
-                "Storage",
-                usedMB,
-                currentPlan.storageLimit
-            );
-        }
-
-        // Check transformations limit (video processing creates 3 versions)
-        const transformationsNeeded = 3; // 1080p, 720p, 480p
-        const canProcessVideo = usage.transformationsUsed + transformationsNeeded <= currentPlan.transformationsLimit;
 
         if (!canProcessVideo) {
             console.log(`⚠️ Transformations exhausted. Uploading raw video only for user ${userId}`);
@@ -156,6 +142,7 @@ export async function POST(req: NextRequest) {
         });
 
         // Update usage tracking (only count transformations if processing was done)
+        const transformationsNeeded = 3; // 1080p, 720p, 480p
         const transformationsUsed = canProcessVideo ? transformationsNeeded : 0;
         await prisma.usageTracking.update({
             where: { id: usage.id },
@@ -165,6 +152,9 @@ export async function POST(req: NextRequest) {
                 uploadsCount: usage.uploadsCount + 1
             }
         });
+
+        // Get plan limits for response
+        const planLimits = await import('@/lib/plan-limits').then(m => m.PLAN_LIMITS.FREE);
 
         const responseData = {
             id: savedMedia.id,
@@ -182,9 +172,9 @@ export async function POST(req: NextRequest) {
                 "Raw upload only - transformation limits exceeded",
             usage: {
                 storageUsed: usage.storageUsed + file.size,
-                storageLimit: storageLimit,
+                storageLimit: planLimits.storageLimit * 1024 * 1024, // Convert MB to bytes
                 transformationsUsed: usage.transformationsUsed + transformationsUsed,
-                transformationsLimit: currentPlan.transformationsLimit
+                transformationsLimit: planLimits.transformationsLimit
             }
         };
 
