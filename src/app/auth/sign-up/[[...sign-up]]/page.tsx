@@ -30,7 +30,7 @@ export default function SignUpPage() {
     // Redirect if already signed in
     useEffect(() => {
         if (authLoaded && isSignedIn) {
-            router.push('/dashboard')
+            router.replace('/dashboard')
         }
     }, [authLoaded, isSignedIn, router])
 
@@ -93,15 +93,15 @@ export default function SignUpPage() {
                 router.push("/dashboard")
             } else {
                 setError("Verification failed. Please try again.")
+                setIsLoading(false)
             }
         } catch (err) {
+            setIsLoading(false)
             if (err instanceof Error) {
                 setError(err.message)
             } else {
                 setError("Verification failed. Please try again.")
             }
-        } finally {
-            setIsLoading(false)
         }
     }
 

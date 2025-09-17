@@ -10,40 +10,26 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Eye, EyeOff, Github, Loader2 } from "lucide-react"
+import { Eye, EyeOff, Github } from "lucide-react"
 import Link from "next/link"
 
 export default function SignInPage() {
     const { isLoaded, signIn, setActive } = useSignIn()
-    const { isLoaded: authLoaded, isSignedIn } = useAuth()
+    const { userId, isSignedIn } = useAuth()
+    const router = useRouter()
     const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
     const [showPassword, setShowPassword] = useState(false)
     const [error, setError] = useState("")
     const [isLoading, setIsLoading] = useState(false)
     const [isChecked, setIsChecked] = useState(false)
-    const router = useRouter()
 
-    // Redirect if already signed in
+    // Check for existing authentication and redirect
     useEffect(() => {
-        if (authLoaded && isSignedIn) {
-            router.push('/dashboard')
+        if (isSignedIn && userId) {
+            router.replace("/dashboard")
         }
-    }, [authLoaded, isSignedIn, router])
-
-    // Show loading spinner while auth is loading
-    if (!authLoaded) {
-        return (
-            <div className="min-h-screen bg-background flex items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin" />
-            </div>
-        )
-    }
-
-    // Don't render form if already signed in (redirect is handled above)
-    if (isSignedIn) {
-        return null
-    }
+    }, [isSignedIn, userId, router])
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -57,7 +43,6 @@ export default function SignInPage() {
                 identifier: email,
                 password,
             })
-
             if (result.status === "complete") {
                 await setActive({ session: result.createdSessionId })
                 router.push("/dashboard")

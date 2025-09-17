@@ -17,7 +17,6 @@ import {
     List,
     Eye,
     Calendar,
-    FileText,
     Sparkles,
     FolderOpen
 } from 'lucide-react'
@@ -89,16 +88,6 @@ export function MediaLibrary({ media, onRefresh, loading = false }: MediaLibrary
                             Start building your media library by uploading your first video or image.
                             All your files will be optimized automatically.
                         </p>
-                        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-                            <Button onClick={onRefresh} className="bg-primary hover:bg-primary/90 cursor-pointer">
-                                <Upload className="h-4 w-4 mr-2" />
-                                Upload First File
-                            </Button>
-                            <Button variant="outline" onClick={onRefresh} className="cursor-pointer">
-                                <FileText className="h-4 w-4 mr-2" />
-                                Learn More
-                            </Button>
-                        </div>
                     </div>
                 </CardContent>
             </Card>
