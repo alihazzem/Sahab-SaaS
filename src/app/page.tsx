@@ -63,7 +63,7 @@ export default function HomePage() {
 
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center mb-12 sm:mb-14 md:mb-16 lg:mb-18 xl:mb-20 px-4 sm:px-0">
-              <Button size="lg" className="w-full sm:w-auto text-sm sm:text-base px-6 sm:px-8 py-3 sm:py-4 bg-primary hover:bg-primary/90 transition-colors min-h-[48px] sm:min-h-[52px]">
+              <Button size="lg" className="w-full sm:w-auto text-sm sm:text-base px-6 sm:px-8 py-3 sm:py-4 bg-primary hover:bg-primary/90 transition-colors min-h-[48px] sm:min-h-[52px] cursor-pointer">
                 <Link href="/auth/sign-up" className="flex items-center gap-2">
                   Get Started Now
                   <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -73,7 +73,7 @@ export default function HomePage() {
               <Button
                 variant="outline"
                 size="lg"
-                className="w-full sm:w-auto text-sm sm:text-base px-6 sm:px-8 py-3 sm:py-4 border-primary/30 hover:bg-primary/10 bg-transparent transition-colors min-h-[48px] sm:min-h-[52px]"
+                className="w-full sm:w-auto text-sm sm:text-base px-6 sm:px-8 py-3 sm:py-4 border-primary/30 hover:bg-primary/10 bg-transparent transition-colors min-h-[48px] sm:min-h-[52px] cursor-pointer"
               >
                 <Play className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
                 Watch Demo
@@ -400,7 +400,7 @@ export default function HomePage() {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
-            <Button size="lg" className="text-sm sm:text-base px-6 sm:px-8 py-3 sm:py-4 bg-primary hover:bg-primary/90 transition-colors min-h-[48px] sm:min-h-[52px]">
+            <Button size="lg" className="text-sm sm:text-base px-6 sm:px-8 py-3 sm:py-4 bg-primary hover:bg-primary/90 transition-colors min-h-[48px] sm:min-h-[52px] cursor-pointer">
               <Link href="/auth/sign-up" className="flex items-center gap-2">
                 Start Your Journey
                 <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -410,7 +410,7 @@ export default function HomePage() {
             <Button
               variant="outline"
               size="lg"
-              className="text-sm sm:text-base px-6 sm:px-8 py-3 sm:py-4 border-primary/30 hover:bg-primary/10 bg-transparent transition-colors min-h-[48px] sm:min-h-[52px]"
+              className="text-sm sm:text-base px-6 sm:px-8 py-3 sm:py-4 border-primary/30 hover:bg-primary/10 bg-transparent transition-colors min-h-[48px] sm:min-h-[52px] cursor-pointer"
             >
               <Link href="/auth/sign-in">Sign In</Link>
             </Button>
