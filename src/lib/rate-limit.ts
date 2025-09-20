@@ -77,7 +77,7 @@ export const RATE_LIMITS: Record<string, RateLimitConfig> = {
     upload: { windowMs: 60 * 1000, maxRequests: 10 }, // 10 uploads per minute
 
     // Payment endpoints
-    payment: { windowMs: 60 * 1000, maxRequests: 5 }, // 5 payment requests per minute
+    payment: { windowMs: 60 * 1000, maxRequests: 10 }, // 5 payment requests per minute
 
     // Public endpoints
     public: { windowMs: 60 * 1000, maxRequests: 200 }, // 200 requests per minute

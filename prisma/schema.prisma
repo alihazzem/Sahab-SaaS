@@ -91,11 +91,55 @@ model UsageTracking {
   @@unique([userId, month, year])
 }
 
+model Admin {
+  id        String    @id @default(cuid())
+  userId    String    @unique // Clerk user ID
+  email     String    @unique // User email for easy identification
+  role      AdminRole @default(ADMIN)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  createdBy String? // Admin who granted this role
+}
+
+model TeamMember {
+  id          String       @id @default(cuid())
+  userId      String       @unique // Clerk user ID of team member
+  email       String // Team member email
+  teamOwnerId String // Clerk user ID of the plan owner (admin)
+  role        TeamRole     @default(MEMBER)
+  permissions String[]     @default([]) // Array of permissions
+  invitedAt   DateTime     @default(now())
+  acceptedAt  DateTime? // When they accepted the invitation
+  status      InviteStatus @default(PENDING)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([teamOwnerId])
+}
+
 enum SubscriptionStatus {
   ACTIVE
   CANCELLED
   EXPIRED
   PAST_DUE
+}
+
+enum AdminRole {
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum TeamRole {
+  MEMBER
+  MANAGER
+  ADMIN
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
 }
 
 enum PaymentStatus {

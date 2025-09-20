@@ -1,5 +1,4 @@
 import CryptoJS from 'crypto-js';
-import { getCustomizedPaymentUrl } from './checkout-customization';
 
 // Additional type definitions for Paymob API
 export interface PaymobMerchant {
@@ -405,13 +404,8 @@ export class PaymobSubscriptionHelper {
             lock_order_when_paid: true,
         });
 
-        // Generate payment URL with your brand customization
-        const customization = getCustomizedPaymentUrl(paymentToken, {
-            theme: 'dark',
-            language: 'en'
-        });
-
-        const paymentUrl = this.client.generatePaymentUrl(paymentToken, customization);
+        // Generate standard payment URL
+        const paymentUrl = this.client.generatePaymentUrl(paymentToken);
 
         return {
             orderId: order.id,

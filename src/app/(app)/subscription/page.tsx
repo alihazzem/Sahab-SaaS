@@ -132,7 +132,6 @@ export default function SubscriptionPage() {
             })
 
             const data = await response.json()
-            console.log('Payment initiation response:', data) // Debug log
 
             if (data.success && data.data?.paymentUrl) {
                 // Redirect to Paymob payment page

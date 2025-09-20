@@ -5,13 +5,36 @@ import { rateLimit, RATE_LIMITS } from '@/lib/rate-limit';
 export default clerkMiddleware(async (auth, req) => {
     const { userId } = await auth();
     const currentUrl = new URL(req.url)
+
     const isAuthPage = currentUrl.pathname.startsWith("/auth/")
     const isApiRoute = currentUrl.pathname.startsWith("/api/")
     const isProtectedAppRoute = currentUrl.pathname.startsWith("/dashboard") ||
         currentUrl.pathname.startsWith("/subscription")
+    const isAdminRoute = currentUrl.pathname.startsWith("/admin")
+    const isAdminApiRoute = currentUrl.pathname.startsWith("/api/admin")
     const isProtectedApiRoute = currentUrl.pathname.startsWith("/api/media") ||
         currentUrl.pathname.startsWith("/api/payment") ||
-        currentUrl.pathname.startsWith("/api/subscription")
+        currentUrl.pathname.startsWith("/api/subscription") ||
+        isAdminApiRoute
+
+    // For admin routes, just check if user is authenticated
+    // The subscription check will be done in the admin page itself
+    if (isAdminRoute) {
+        if (!userId) {
+            return NextResponse.redirect(new URL('/auth/sign-in', req.url))
+        }
+        // Let authenticated users through - subscription check happens in the component
+    }
+
+    // For admin API routes, also just check authentication
+    if (isAdminApiRoute) {
+        if (!userId) {
+            return NextResponse.json(
+                { success: false, error: "Authentication required" },
+                { status: 401 }
+            )
+        }
+    }
 
     // Protect app routes - redirect unauthenticated users to sign-in
     if (!userId && isProtectedAppRoute) {
@@ -99,6 +122,7 @@ export const config = {
         "/(api|trpc)(.*)",
         // Explicitly match protected app routes
         "/dashboard/:path*",
-        "/subscription/:path*"
+        "/subscription/:path*",
+        "/admin/:path*"
     ],
 };

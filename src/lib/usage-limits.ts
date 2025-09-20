@@ -39,7 +39,6 @@ export async function getUserPlanLimits(userId: string): Promise<typeof PLAN_LIM
         // })
 
         // For now, return Free plan limits (userId will be used when subscription system is connected)
-        console.log(`Getting plan limits for user: ${userId}`) // Temporary usage to avoid lint warning
         return PLAN_LIMITS.FREE
     } catch (error) {
         console.error('Failed to get user plan limits:', error)

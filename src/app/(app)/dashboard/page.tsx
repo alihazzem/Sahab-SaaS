@@ -79,7 +79,6 @@ export default function DashboardPage() {
                             console.error('Media API: Unauthorized - status 401')
                             // Retry once after a short delay in case of auth timing issue
                             if (retryCount < 1) {
-                                console.log('Retrying media API call...')
                                 await new Promise(resolve => setTimeout(resolve, 500))
                                 return { success: false, error: 'Retry' }
                             }
@@ -103,7 +102,6 @@ export default function DashboardPage() {
                             console.error('Subscription API: Unauthorized - status 401')
                             // Retry once after a short delay in case of auth timing issue
                             if (retryCount < 1) {
-                                console.log('Retrying subscription API call...')
                                 await new Promise(resolve => setTimeout(resolve, 500))
                                 return { success: false, error: 'Retry' }
                             }
@@ -124,9 +122,6 @@ export default function DashboardPage() {
                 return loadData(retryCount + 1)
             }
 
-            console.log('Media response:', mediaRes)
-            console.log('Subscription response:', subRes)
-
             // Don't continue if we got unauthorized responses
             if (mediaRes.error === 'Unauthorized' || subRes.error === 'Unauthorized') {
                 return
@@ -134,14 +129,12 @@ export default function DashboardPage() {
 
             if (mediaRes.success) {
                 setMedia(mediaRes.data?.data || [])
-                console.log('Media set:', mediaRes.data?.data || [])
             } else {
                 console.error('Media API error:', mediaRes.error || mediaRes)
             }
 
             if (subRes.success) {
                 setSubscription(subRes.subscription)
-                console.log('Subscription set:', subRes.subscription)
             } else {
                 console.error('Subscription API error:', subRes.error || subRes)
             }
@@ -166,7 +159,6 @@ export default function DashboardPage() {
     }, [router, error]);
 
     useEffect(() => {
-        console.log('Component mounted, loading data...')
         loadData()
     }, [loadData])
 
@@ -368,6 +360,47 @@ export default function DashboardPage() {
                             </div>
 
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+                                {/* Team Management Card - For Pro/Enterprise subscribers */}
+                                {subscription && ['Pro', 'Enterprise', 'pro', 'enterprise'].includes(subscription.plan.name) && (
+                                    <Card className="group border-border hover:border-primary/50 hover:shadow-lg transition-all duration-300 cursor-pointer bg-gradient-to-br from-card to-card/50"
+                                        onClick={() => router.push('/admin')}>
+                                        <CardHeader className="pb-3">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center space-x-3 min-w-0 flex-1">
+                                                    <div className="p-2 bg-purple-500/10 rounded-lg group-hover:bg-purple-500/20 transition-colors flex-shrink-0">
+                                                        <BarChart3 className="h-5 w-5 sm:h-6 sm:w-6 text-purple-500" />
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <CardTitle className="text-base sm:text-lg truncate">Team Management</CardTitle>
+                                                        <p className="text-xs text-muted-foreground mt-1 truncate">
+                                                            Manage team members & access
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <Plus className="h-6 w-6 sm:h-8 sm:w-8 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0" />
+                                            </div>
+                                        </CardHeader>
+                                        <CardContent className="pt-0">
+                                            <div className="space-y-2">
+                                                <div className="text-xs sm:text-sm text-muted-foreground">
+                                                    • Invite team members
+                                                </div>
+                                                <div className="text-xs sm:text-sm text-muted-foreground">
+                                                    • Manage roles & permissions
+                                                </div>
+                                                <div className="text-xs sm:text-sm text-muted-foreground">
+                                                    • Control team access
+                                                </div>
+                                            </div>
+                                            <div className="mt-4 pt-3 border-t border-border/50">
+                                                <span className="text-xs text-purple-600 font-medium">
+                                                    {subscription.plan.name} Feature
+                                                </span>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                )}
+
                                 {/* Video Upload Card */}
                                 <Card className={`group border-border hover:border-primary/50 hover:shadow-lg transition-all duration-300 cursor-pointer bg-gradient-to-br from-card to-card/50 ${uploadTasks.some(task => task.type === 'video' && task.status === 'uploading')
                                     ? 'ring-2 ring-blue-500/20 bg-blue-50/5'
