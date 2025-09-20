@@ -1,4 +1,5 @@
 import CryptoJS from 'crypto-js';
+import { getCustomizedPaymentUrl } from './checkout-customization';
 
 // Additional type definitions for Paymob API
 export interface PaymobMerchant {
@@ -283,9 +284,41 @@ export class PaymobClient {
         }
     }
 
-    // Generate payment URL for iframe
-    generatePaymentUrl(paymentToken: string): string {
-        return `https://accept.paymobsolutions.com/api/acceptance/iframes/${paymobConfig.iframeId}?payment_token=${paymentToken}`;
+    // Generate payment URL for iframe with customization options
+    generatePaymentUrl(paymentToken: string, customization?: {
+        primaryColor?: string;
+        hideAmount?: boolean;
+        hideCurrency?: boolean;
+        language?: 'en' | 'ar';
+        redirectUrl?: string;
+    }): string {
+        let url = `https://accept.paymobsolutions.com/api/acceptance/iframes/${paymobConfig.iframeId}?payment_token=${paymentToken}`;
+
+        if (customization) {
+            const params = new URLSearchParams();
+
+            if (customization.primaryColor) {
+                params.append('primary_color', customization.primaryColor.replace('#', ''));
+            }
+            if (customization.hideAmount) {
+                params.append('hide_amount', 'true');
+            }
+            if (customization.hideCurrency) {
+                params.append('hide_currency', 'true');
+            }
+            if (customization.language) {
+                params.append('language', customization.language);
+            }
+            if (customization.redirectUrl) {
+                params.append('redirect_url', customization.redirectUrl);
+            }
+
+            if (params.toString()) {
+                url += '&' + params.toString();
+            }
+        }
+
+        return url;
     }
 
     // Verify webhook HMAC signature
@@ -372,8 +405,13 @@ export class PaymobSubscriptionHelper {
             lock_order_when_paid: true,
         });
 
-        // Generate payment URL
-        const paymentUrl = this.client.generatePaymentUrl(paymentToken);
+        // Generate payment URL with your brand customization
+        const customization = getCustomizedPaymentUrl(paymentToken, {
+            theme: 'dark',
+            language: 'en'
+        });
+
+        const paymentUrl = this.client.generatePaymentUrl(paymentToken, customization);
 
         return {
             orderId: order.id,

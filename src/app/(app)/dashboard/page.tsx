@@ -321,6 +321,14 @@ export default function DashboardPage() {
                                 <Plus className="h-4 w-4 mr-2" />
                                 Upload Image
                             </Button>
+                            <Button
+                                onClick={() => router.push('/subscription')}
+                                variant="outline"
+                                className="border-border hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer w-full sm:w-auto"
+                            >
+                                <BarChart3 className="h-4 w-4 mr-2" />
+                                Manage Plan
+                            </Button>
                         </div>
                     </div>
                 </div>
@@ -362,8 +370,8 @@ export default function DashboardPage() {
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                                 {/* Video Upload Card */}
                                 <Card className={`group border-border hover:border-primary/50 hover:shadow-lg transition-all duration-300 cursor-pointer bg-gradient-to-br from-card to-card/50 ${uploadTasks.some(task => task.type === 'video' && task.status === 'uploading')
-                                        ? 'ring-2 ring-blue-500/20 bg-blue-50/5'
-                                        : ''
+                                    ? 'ring-2 ring-blue-500/20 bg-blue-50/5'
+                                    : ''
                                     }`}
                                     onClick={handleVideoUpload}>
                                     <CardHeader className="pb-3">
@@ -404,8 +412,8 @@ export default function DashboardPage() {
 
                                 {/* Image Upload Card */}
                                 <Card className={`group border-border hover:border-primary/50 hover:shadow-lg transition-all duration-300 cursor-pointer bg-gradient-to-br from-card to-card/50 ${uploadTasks.some(task => task.type === 'image' && task.status === 'uploading')
-                                        ? 'ring-2 ring-green-500/20 bg-green-50/5'
-                                        : ''
+                                    ? 'ring-2 ring-green-500/20 bg-green-50/5'
+                                    : ''
                                     }`}
                                     onClick={handleImageUpload}>
                                     <CardHeader className="pb-3">

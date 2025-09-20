@@ -16,8 +16,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Cloudinary SaaS - Media Manager",
-  description: "Upload, manage, and stream your videos and images securely with Cloudinary SaaS",
+  title: "Sahab - Media Manager",
+  description: "Upload, manage, and stream your videos and images securely with Sahab",
+  icons: {
+    icon: [
+      { url: "/logo.png", type: "image/png", sizes: "32x32" },
+    ],
+  },
 };
 
 export default function RootLayout({

@@ -142,12 +142,15 @@ export async function POST(req: NextRequest) {
         });
 
         // Update usage tracking (only count transformations if processing was done)
+        // Convert file size from bytes to MB for storage tracking
+        const fileSizeInMB = file.size / (1024 * 1024);
+
         const transformationsNeeded = 3; // 1080p, 720p, 480p
         const transformationsUsed = canProcessVideo ? transformationsNeeded : 0;
         await prisma.usageTracking.update({
             where: { id: usage.id },
             data: {
-                storageUsed: usage.storageUsed + file.size,
+                storageUsed: usage.storageUsed + fileSizeInMB,
                 transformationsUsed: usage.transformationsUsed + transformationsUsed,
                 uploadsCount: usage.uploadsCount + 1
             }
@@ -171,7 +174,7 @@ export async function POST(req: NextRequest) {
                 "Video processed with multiple resolutions" :
                 "Raw upload only - transformation limits exceeded",
             usage: {
-                storageUsed: usage.storageUsed + file.size,
+                storageUsed: (usage.storageUsed + fileSizeInMB) * 1024 * 1024, // Convert MB back to bytes for response
                 storageLimit: planLimits.storageLimit * 1024 * 1024, // Convert MB to bytes
                 transformationsUsed: usage.transformationsUsed + transformationsUsed,
                 transformationsLimit: planLimits.transformationsLimit

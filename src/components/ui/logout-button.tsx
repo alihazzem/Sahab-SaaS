@@ -5,9 +5,11 @@ import { Button } from '@/components/ui/button'
 import { LogOut, Camera, User } from 'lucide-react'
 import { useState, useRef } from 'react'
 import Image from 'next/image'
+import { useToast } from '@/components/ui/toast'
 
 function ProfilePicture() {
     const { user } = useUser()
+    const { error: showError, success } = useToast()
     const [uploading, setUploading] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -24,9 +26,10 @@ function ProfilePicture() {
             await user.setProfileImage({ file })
             // Force a re-render by updating the user
             await user.reload()
+            success("Profile Picture Updated", "Your profile picture has been updated successfully")
         } catch (error) {
             console.error('Error updating profile picture:', error)
-            alert('Failed to update profile picture')
+            showError("Update Failed", "Failed to update profile picture. Please try again.")
         } finally {
             setUploading(false)
         }

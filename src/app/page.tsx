@@ -17,13 +17,101 @@ import {
   CheckCircle,
   Users,
   TrendingUp,
-  Clock
+  Clock,
+  ChevronUp
 } from "lucide-react"
 import Link from "next/link"
+import Image from "next/image"
+import { useState, useEffect } from "react"
 
 export default function HomePage() {
+  const [showScrollTop, setShowScrollTop] = useState(false);
+
+  useEffect(() => {
+    const toggleVisibility = () => {
+      if (window.pageYOffset > 300) {
+        setShowScrollTop(true);
+      } else {
+        setShowScrollTop(false);
+      }
+    };
+
+    window.addEventListener('scroll', toggleVisibility);
+    return () => window.removeEventListener('scroll', toggleVisibility);
+  }, []);
+
+  const scrollToSection = (sectionId: string) => {
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+      });
+    }
+  };
+
+  const scrollToTop = () => {
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
+  };
+
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground scroll-smooth">
+      {/* Navigation Bar */}
+      <nav className="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16 md:h-20">
+            {/* Logo */}
+            <div className="flex items-center">
+              <Link href="/" className="flex items-center">
+                <Image
+                  src="/logo.png"
+                  alt="Sahab Logo"
+                  width={60}
+                  height={60}
+                  className="w-24 h-24 md:w-28 md:h-28 object-contain"
+                  priority
+                />
+              </Link>
+            </div>
+
+            {/* Navigation Links - Hidden on mobile */}
+            <div className="hidden md:flex items-center space-x-8">
+              <button
+                onClick={() => scrollToSection('features')}
+                className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              >
+                Features
+              </button>
+              <button
+                onClick={() => scrollToSection('pricing')}
+                className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              >
+                Pricing
+              </button>
+              <button
+                onClick={() => scrollToSection('about')}
+                className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              >
+                About
+              </button>
+            </div>
+
+            {/* Auth Buttons */}
+            <div className="flex items-center gap-3">
+              <Button variant="outline" size="sm" className="text-sm px-4 py-2 bg-muted/50 hover:bg-muted border-border cursor-pointer">
+                <Link href="/auth/sign-in">Sign In</Link>
+              </Button>
+              <Button size="sm" className="text-sm px-4 py-2 cursor-pointer">
+                <Link href="/auth/sign-up ">Sign Up</Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+      </nav>
+
       {/* Hero Section */}
       <section className="relative overflow-hidden">
         {/* Background Pattern */}
@@ -37,7 +125,7 @@ export default function HomePage() {
         />
 
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 xl:px-12">
-          <div className="pt-12 pb-12 sm:pt-16 sm:pb-16 md:pt-20 md:pb-20 lg:pt-24 lg:pb-24">
+          <div className="pt-16 pb-12 sm:pt-20 sm:pb-16 md:pt-24 md:pb-20 lg:pt-28 lg:pb-24">
             {/* Badge */}
             <div className="text-center mb-6 sm:mb-8 md:mb-10">
               <Badge variant="secondary" className="inline-flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium bg-primary/10 text-primary border-primary/20 hover:bg-primary/20 transition-colors">
@@ -65,7 +153,7 @@ export default function HomePage() {
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center mb-12 sm:mb-14 md:mb-16 lg:mb-18 xl:mb-20 px-4 sm:px-0">
               <Button size="lg" className="w-full sm:w-auto text-sm sm:text-base px-6 sm:px-8 py-3 sm:py-4 bg-primary hover:bg-primary/90 transition-colors min-h-[48px] sm:min-h-[52px] cursor-pointer">
                 <Link href="/auth/sign-up" className="flex items-center gap-2">
-                  Get Started Now
+                  Get Started Free
                   <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
                 </Link>
               </Button>
@@ -140,7 +228,7 @@ export default function HomePage() {
       </section>
 
       {/* Features Section */}
-      <section className="py-12 sm:py-16 md:py-20 lg:py-24 xl:py-28 bg-muted/30">
+      <section id="features" className="py-12 sm:py-16 md:py-20 lg:py-24 xl:py-28 bg-muted/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 xl:px-12">
           <div className="text-center mb-12 sm:mb-14 md:mb-16 lg:mb-18">
             <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-4 sm:mb-5 md:mb-6 text-balance">
@@ -238,7 +326,7 @@ export default function HomePage() {
       </section>
 
       {/* Features Stats Section */}
-      <section className="py-12 sm:py-16 md:py-20 lg:py-24 xl:py-28 bg-primary/5">
+      <section id="about" className="py-12 sm:py-16 md:py-20 lg:py-24 xl:py-28 bg-primary/5">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 xl:px-12">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 md:gap-10 lg:gap-8 text-center">
             <div className="space-y-3 sm:space-y-4">
@@ -277,7 +365,7 @@ export default function HomePage() {
       </section>
 
       {/* Pricing Preview */}
-      <section className="py-12 sm:py-16 md:py-20 lg:py-24 xl:py-28">
+      <section id="pricing" className="py-12 sm:py-16 md:py-20 lg:py-24 xl:py-28">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 xl:px-12">
           <div className="text-center mb-12 sm:mb-14 md:mb-16 lg:mb-18">
             <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-4 sm:mb-5 md:mb-6 text-balance">
@@ -421,6 +509,17 @@ export default function HomePage() {
           </p>
         </div>
       </section>
+
+      {/* Scroll to Top Button */}
+      {showScrollTop && (
+        <button
+          onClick={scrollToTop}
+          className="fixed bottom-6 right-6 z-50 bg-primary hover:bg-primary/90 text-primary-foreground p-3 rounded-full shadow-lg transition-all duration-300 hover:scale-110 cursor-pointer"
+          aria-label="Scroll to top"
+        >
+          <ChevronUp className="w-5 h-5" />
+        </button>
+      )}
     </div>
   )
 }

@@ -134,7 +134,7 @@ export default function SignUpPage() {
                             {verifying ? "Verify Email" : "Create your account"}
                         </CardTitle>
                         <CardDescription className="text-center text-muted-foreground">
-                            {verifying ? "Enter the verification code sent to your email" : "Get started with Cloudinary SaaS today"}
+                            {verifying ? "Enter the verification code sent to your email" : "Get started with Sahab today"}
                         </CardDescription>
                     </CardHeader>
                     <CardContent>

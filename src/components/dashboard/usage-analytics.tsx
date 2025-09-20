@@ -17,8 +17,8 @@ import {
     Sparkles,
     FileImage
 } from 'lucide-react'
-import { formatSize } from '@/utils/format'
 import { formatFileSize, PLAN_LIMITS } from '@/lib/client-usage'
+import { formatStorageLimit, formatStorageDisplay, getUsagePercentage } from '@/utils/storage'
 import type { UsageAnalyticsProps } from '@/types'
 
 export function UsageAnalytics({ subscription }: UsageAnalyticsProps) {
@@ -28,12 +28,13 @@ export function UsageAnalytics({ subscription }: UsageAnalyticsProps) {
 
     const { plan, usage } = subscription
 
-    // Convert bytes to MB for storage calculations
-    const storageUsedMB = usage.storageUsed / (1024 * 1024)
-    const storageRemainingMB = Math.max(0, plan.storageLimit - storageUsedMB)
+    // Convert MB values to proper display format
+    const storageUsedMB = usage.storageUsed // Already in MB from database
+    const storageLimitMB = plan.storageLimit // Already in MB from database
+    const storageRemainingMB = Math.max(0, storageLimitMB - storageUsedMB)
 
-    const storagePercentage = (storageUsedMB / plan.storageLimit) * 100
-    const transformationsPercentage = (usage.transformationsUsed / plan.transformationsLimit) * 100
+    const storagePercentage = getUsagePercentage(storageUsedMB, storageLimitMB)
+    const transformationsPercentage = getUsagePercentage(usage.transformationsUsed, plan.transformationsLimit)
 
     // Calculate how many videos can still be processed (each video uses 3 transformations)
     const videosRemainingWithProcessing = Math.floor(usage.transformationsRemaining / 3)
@@ -112,7 +113,7 @@ export function UsageAnalytics({ subscription }: UsageAnalyticsProps) {
                                 Storage Limit
                             </div>
                             <div className="text-lg font-bold text-primary">
-                                {formatFileSize(planLimits.storage)}
+                                {formatStorageLimit(plan.storageLimit)}
                             </div>
                             <p className="text-xs text-muted-foreground">
                                 Total storage space
@@ -157,12 +158,12 @@ export function UsageAnalytics({ subscription }: UsageAnalyticsProps) {
                     <CardContent>
                         <div className="space-y-4">
                             <div className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-                                {formatSize(usage.storageUsed)}
+                                {formatStorageDisplay(storageUsedMB)}
                             </div>
                             <div className="space-y-2">
                                 <div className="flex justify-between text-xs">
                                     <span className="text-muted-foreground">
-                                        of {plan.storageLimit} MB
+                                        of {formatStorageLimit(storageLimitMB)}
                                     </span>
                                     <span className={`font-medium ${getUsageColor(storagePercentage)}`}>
                                         {storagePercentage.toFixed(1)}%
@@ -176,7 +177,7 @@ export function UsageAnalytics({ subscription }: UsageAnalyticsProps) {
                             <div className="pt-2 border-t border-border/50">
                                 <div className={`text-xs flex items-center gap-1 ${getUsageColor(storagePercentage)}`}>
                                     <ArrowUp className="h-3 w-3 rotate-45" />
-                                    {storageRemainingMB.toFixed(1)} MB remaining
+                                    {formatStorageDisplay(storageRemainingMB)} remaining
                                 </div>
                             </div>
                         </div>
