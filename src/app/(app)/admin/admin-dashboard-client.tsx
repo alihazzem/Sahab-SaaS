@@ -6,6 +6,26 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Select } from '@/components/ui/select';
+import { useToast } from '@/components/ui/toast';
+import {
+    Users,
+    UserPlus,
+    Shield,
+    Search,
+    Filter,
+    Mail,
+    Calendar,
+    CheckCircle,
+    Clock,
+    XCircle,
+    Edit,
+    Trash2,
+    Crown,
+    UserCheck,
+    Settings,
+    RefreshCw
+} from 'lucide-react';
 
 interface TeamMember {
     id: string;
@@ -19,7 +39,6 @@ interface TeamMember {
 }
 
 interface AdminDashboardClientProps {
-    adminRole: string;
     subscription?: {
         id: string;
         planName: string;
@@ -30,7 +49,6 @@ interface AdminDashboardClientProps {
 }
 
 export default function AdminDashboardClient({
-    adminRole,
     subscription,
     teamMembersCount
 }: AdminDashboardClientProps) {
@@ -40,6 +58,11 @@ export default function AdminDashboardClient({
     const [inviteEmail, setInviteEmail] = useState('');
     const [inviteRole, setInviteRole] = useState<'MEMBER' | 'MANAGER' | 'ADMIN'>('MEMBER');
     const [inviting, setInviting] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [filterRole, setFilterRole] = useState<'ALL' | 'MEMBER' | 'MANAGER' | 'ADMIN'>('ALL');
+    const [filterStatus, setFilterStatus] = useState<'ALL' | 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'EXPIRED'>('ALL');
+
+    const { success, error: showError } = useToast();
 
     useEffect(() => {
         fetchTeamMembers();
@@ -90,8 +113,9 @@ export default function AdminDashboardClient({
             setInviteEmail('');
             setInviteRole('MEMBER');
             fetchTeamMembers();
+            success('Team member invited successfully', 'An invitation email has been sent.');
         } catch (err) {
-            setError((err as Error).message || 'Failed to invite team member');
+            showError('Invitation failed', (err as Error).message || 'Failed to invite team member');
             console.error('Invite error:', err);
         } finally {
             setInviting(false);
@@ -113,13 +137,43 @@ export default function AdminDashboardClient({
             }
 
             fetchTeamMembers();
+            success('Team member removed', 'The team member has been removed successfully.');
         } catch (err) {
-            setError('Failed to remove team member');
+            showError('Remove failed', 'Failed to remove team member');
             console.error('Remove error:', err);
         }
     };
 
-    const canAddMoreMembers = teamMembersCount < (subscription?.teamMembersAllowed || 0);
+    const canAddMoreMembers = (subscription?.teamMembersAllowed || 0) === -1 || teamMembersCount < (subscription?.teamMembersAllowed || 0);
+    const isUnlimitedPlan = (subscription?.teamMembersAllowed || 0) === -1;
+    const remainingSlots = isUnlimitedPlan ? 'Unlimited' : Math.max(0, (subscription?.teamMembersAllowed || 0) - teamMembersCount);
+
+    // Filter team members based on search and filter criteria
+    const filteredTeamMembers = teamMembers.filter(member => {
+        const matchesSearch = member.email.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesRole = filterRole === 'ALL' || member.role === filterRole;
+        const matchesStatus = filterStatus === 'ALL' || member.status === filterStatus;
+        return matchesSearch && matchesRole && matchesStatus;
+    });
+
+    const getStatusIcon = (status: string) => {
+        switch (status) {
+            case 'ACCEPTED': return CheckCircle;
+            case 'PENDING': return Clock;
+            case 'DECLINED': return XCircle;
+            case 'EXPIRED': return XCircle;
+            default: return Clock;
+        }
+    };
+
+    const getRoleIcon = (role: string) => {
+        switch (role) {
+            case 'ADMIN': return Crown;
+            case 'MANAGER': return Shield;
+            case 'MEMBER': return UserCheck;
+            default: return UserCheck;
+        }
+    };
 
     if (loading) {
         return (
@@ -139,80 +193,135 @@ export default function AdminDashboardClient({
 
             {/* Team Overview */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Current Plan</CardTitle>
+                <Card className="group hover:shadow-lg transition-all duration-300 border-border hover:border-primary/30 bg-gradient-to-br from-card to-card/50">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                        <CardTitle className="text-sm font-medium">Current Plan</CardTitle>
+                        <div className="p-2 bg-purple-500/10 rounded-lg group-hover:bg-purple-500/20 transition-colors">
+                            <Crown className="h-4 w-4 text-purple-500" />
+                        </div>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{subscription?.planName}</div>
+                        <div className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                            {subscription?.planName}
+                        </div>
                         <p className="text-sm text-muted-foreground">Status: {subscription?.status}</p>
+                        <div className="mt-3 pt-3 border-t border-border/50">
+                            <Badge variant={subscription?.status === 'ACTIVE' ? 'default' : 'secondary'} className="text-xs">
+                                {subscription?.status === 'ACTIVE' ? 'Active' : subscription?.status}
+                            </Badge>
+                        </div>
                     </CardContent>
                 </Card>
 
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Team Members</CardTitle>
+                <Card className="group hover:shadow-lg transition-all duration-300 border-border hover:border-primary/30 bg-gradient-to-br from-card to-card/50">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                        <CardTitle className="text-sm font-medium">Team Members</CardTitle>
+                        <div className="p-2 bg-blue-500/10 rounded-lg group-hover:bg-blue-500/20 transition-colors">
+                            <Users className="h-4 w-4 text-blue-500" />
+                        </div>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">
-                            {teamMembersCount} / {subscription?.teamMembersAllowed || 0}
+                        <div className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                            {teamMembersCount} / {isUnlimitedPlan ? '∞' : subscription?.teamMembersAllowed || 0}
                         </div>
                         <p className="text-sm text-muted-foreground">
-                            {(subscription?.teamMembersAllowed || 0) - teamMembersCount} slots available
+                            {isUnlimitedPlan ? 'Unlimited team members' : `${remainingSlots} slots available`}
                         </p>
+                        <div className="mt-3 pt-3 border-t border-border/50">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs text-muted-foreground">Active members</span>
+                                <Badge variant="secondary" className="text-xs">
+                                    {teamMembers.filter(m => m.status === 'ACCEPTED').length}
+                                </Badge>
+                            </div>
+                        </div>
                     </CardContent>
                 </Card>
 
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Your Role</CardTitle>
+                <Card className="group hover:shadow-lg transition-all duration-300 border-border hover:border-primary/30 bg-gradient-to-br from-card to-card/50">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                        <CardTitle className="text-sm font-medium">Your Role</CardTitle>
+                        <div className="p-2 bg-green-500/10 rounded-lg group-hover:bg-green-500/20 transition-colors">
+                            <Shield className="h-4 w-4 text-green-500" />
+                        </div>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold capitalize">{adminRole.replace('_', ' ')}</div>
-                        <p className="text-sm text-muted-foreground">Team Owner</p>
+                        <div className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                            Team Owner
+                        </div>
+                        <p className="text-sm text-muted-foreground">Administrator</p>
+                        <div className="mt-3 pt-3 border-t border-border/50">
+                            <Badge variant="default" className="text-xs">
+                                Full Access
+                            </Badge>
+                        </div>
                     </CardContent>
                 </Card>
             </div>
 
             {/* Invite New Member */}
             {canAddMoreMembers && (
-                <Card>
+                <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-secondary/5">
                     <CardHeader>
-                        <CardTitle>Invite Team Member</CardTitle>
+                        <CardTitle className="flex items-center gap-2">
+                            <UserPlus className="h-5 w-5 text-primary" />
+                            Invite Team Member
+                        </CardTitle>
+                        <p className="text-sm text-muted-foreground">
+                            Send an invitation to add a new member to your team
+                        </p>
                     </CardHeader>
                     <CardContent>
-                        <div className="flex space-x-4">
-                            <Input
-                                placeholder="Enter email address"
-                                value={inviteEmail}
-                                onChange={(e) => setInviteEmail(e.target.value)}
-                                type="email"
-                                className="flex-1"
-                            />
-                            <select
-                                value={inviteRole}
-                                onChange={(e) => setInviteRole(e.target.value as 'MEMBER' | 'MANAGER' | 'ADMIN')}
-                                className="px-3 py-2 border rounded-md"
-                            >
-                                <option value="MEMBER">Member</option>
-                                <option value="MANAGER">Manager</option>
-                                <option value="ADMIN">Admin</option>
-                            </select>
+                        <div className="flex flex-col sm:flex-row gap-4">
+                            <div className="flex-1">
+                                <Input
+                                    placeholder="Enter email address"
+                                    value={inviteEmail}
+                                    onChange={(e) => setInviteEmail(e.target.value)}
+                                    type="email"
+                                    className="w-full"
+                                />
+                            </div>
+                            <div className="sm:w-40">
+                                <Select
+                                    value={inviteRole}
+                                    onValueChange={(value) => setInviteRole(value as 'MEMBER' | 'MANAGER' | 'ADMIN')}
+                                    options={[
+                                        { value: 'MEMBER', label: 'Member' },
+                                        { value: 'MANAGER', label: 'Manager' },
+                                        { value: 'ADMIN', label: 'Admin' }
+                                    ]}
+                                    placeholder="Select role"
+                                />
+                            </div>
                             <Button
                                 onClick={handleInviteTeamMember}
                                 disabled={!inviteEmail || inviting}
+                                className="cursor-pointer"
                             >
-                                {inviting ? 'Inviting...' : 'Invite'}
+                                {inviting ? (
+                                    <>
+                                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                                        Inviting...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Mail className="h-4 w-4 mr-2" />
+                                        Send Invite
+                                    </>
+                                )}
                             </Button>
                         </div>
-                        <p className="text-sm text-muted-foreground mt-2">
-                            Available roles: Member (basic access), Manager (can manage content), Admin (full access)
-                        </p>
+                        <div className="mt-4 p-3 bg-background/50 rounded-lg">
+                            <p className="text-sm text-muted-foreground">
+                                <strong>Role permissions:</strong> Member (basic access), Manager (content management), Admin (full access including team management)
+                            </p>
+                        </div>
                     </CardContent>
                 </Card>
             )}
 
-            {!canAddMoreMembers && (
+            {!canAddMoreMembers && !isUnlimitedPlan && (
                 <Alert>
                     <AlertDescription>
                         You have reached the maximum number of team members for your {subscription?.planName} plan.
@@ -224,82 +333,233 @@ export default function AdminDashboardClient({
             {/* Team Members List */}
             <Card>
                 <CardHeader>
-                    <CardTitle>Team Members</CardTitle>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div className="flex items-center gap-2">
+                            <Users className="h-5 w-5 text-primary" />
+                            <CardTitle>Team Members ({filteredTeamMembers.length})</CardTitle>
+                        </div>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={fetchTeamMembers}
+                            disabled={loading}
+                            className="cursor-pointer"
+                        >
+                            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                            Refresh
+                        </Button>
+                    </div>
+
+                    {/* Search and Filter */}
+                    <div className="flex flex-col sm:flex-row gap-4 mt-4">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Search by email..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="pl-10"
+                            />
+                        </div>
+                        <div className="flex gap-2">
+                            <Select
+                                value={filterRole}
+                                onValueChange={(value) => setFilterRole(value as 'ALL' | 'MEMBER' | 'MANAGER' | 'ADMIN')}
+                                options={[
+                                    { value: 'ALL', label: 'All Roles' },
+                                    { value: 'MEMBER', label: 'Member' },
+                                    { value: 'MANAGER', label: 'Manager' },
+                                    { value: 'ADMIN', label: 'Admin' }
+                                ]}
+                                className="min-w-[120px]"
+                            />
+                            <Select
+                                value={filterStatus}
+                                onValueChange={(value) => setFilterStatus(value as 'ALL' | 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'EXPIRED')}
+                                options={[
+                                    { value: 'ALL', label: 'All Status' },
+                                    { value: 'PENDING', label: 'Pending' },
+                                    { value: 'ACCEPTED', label: 'Accepted' },
+                                    { value: 'DECLINED', label: 'Declined' },
+                                    { value: 'EXPIRED', label: 'Expired' }
+                                ]}
+                                className="min-w-[120px]"
+                            />
+                        </div>
+                    </div>
                 </CardHeader>
                 <CardContent>
-                    {teamMembers.length === 0 ? (
-                        <p className="text-muted-foreground text-center py-8">
-                            No team members yet. Invite your first team member above.
-                        </p>
+                    {filteredTeamMembers.length === 0 ? (
+                        <div className="text-center py-12">
+                            {teamMembers.length === 0 ? (
+                                <>
+                                    <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                                    <p className="text-muted-foreground text-lg font-medium mb-2">
+                                        No team members yet
+                                    </p>
+                                    <p className="text-muted-foreground text-sm">
+                                        Invite your first team member to get started with collaboration
+                                    </p>
+                                </>
+                            ) : (
+                                <>
+                                    <Filter className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                                    <p className="text-muted-foreground text-lg font-medium mb-2">
+                                        No members match your filters
+                                    </p>
+                                    <p className="text-muted-foreground text-sm">
+                                        Try adjusting your search or filter criteria
+                                    </p>
+                                </>
+                            )}
+                        </div>
                     ) : (
                         <div className="space-y-4">
-                            {teamMembers.map((member) => (
-                                <div key={member.id} className="flex items-center justify-between p-4 border rounded-lg">
-                                    <div>
-                                        <h3 className="font-medium">{member.email}</h3>
-                                        <div className="flex items-center space-x-2 mt-1">
-                                            <Badge variant={member.role === 'ADMIN' ? 'default' : 'secondary'}>
-                                                {member.role}
-                                            </Badge>
-                                            <Badge
-                                                variant={
-                                                    member.status === 'ACCEPTED' ? 'default' :
-                                                        member.status === 'PENDING' ? 'secondary' : 'destructive'
-                                                }
-                                            >
-                                                {member.status}
-                                            </Badge>
+                            {filteredTeamMembers.map((member) => {
+                                const StatusIcon = getStatusIcon(member.status);
+                                const RoleIcon = getRoleIcon(member.role);
+
+                                return (
+                                    <div key={member.id} className="group p-4 border border-border rounded-lg hover:border-primary/30 transition-all duration-200 bg-gradient-to-r from-background to-background/50">
+                                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-3 mb-2">
+                                                    <div className="p-2 bg-primary/10 rounded-lg">
+                                                        <Mail className="h-4 w-4 text-primary" />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <h3 className="font-medium text-foreground truncate">{member.email}</h3>
+                                                        <div className="flex items-center gap-2 mt-1">
+                                                            <Badge
+                                                                variant={member.role === 'ADMIN' ? 'default' : member.role === 'MANAGER' ? 'secondary' : 'outline'}
+                                                                className="text-xs"
+                                                            >
+                                                                <RoleIcon className="h-3 w-3 mr-1" />
+                                                                {member.role === 'ADMIN' ? 'Admin' : member.role === 'MANAGER' ? 'Manager' : 'Member'}
+                                                            </Badge>
+                                                            <Badge
+                                                                variant={
+                                                                    member.status === 'ACCEPTED' ? 'default' :
+                                                                        member.status === 'PENDING' ? 'secondary' : 'destructive'
+                                                                }
+                                                                className="text-xs"
+                                                            >
+                                                                <StatusIcon className="h-3 w-3 mr-1" />
+                                                                {member.status}
+                                                            </Badge>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex items-center gap-4 text-xs text-muted-foreground ml-11">
+                                                    <div className="flex items-center gap-1">
+                                                        <Calendar className="h-3 w-3" />
+                                                        Invited: {new Date(member.invitedAt).toLocaleDateString()}
+                                                    </div>
+                                                    {member.acceptedAt && (
+                                                        <div className="flex items-center gap-1">
+                                                            <CheckCircle className="h-3 w-3" />
+                                                            Joined: {new Date(member.acceptedAt).toLocaleDateString()}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-2 sm:ml-4">
+                                                {member.status === 'PENDING' && (
+                                                    <Button size="sm" variant="outline" className="cursor-pointer">
+                                                        <Mail className="h-4 w-4 mr-1" />
+                                                        Resend
+                                                    </Button>
+                                                )}
+                                                <Button size="sm" variant="outline" className="cursor-pointer">
+                                                    <Edit className="h-4 w-4 mr-1" />
+                                                    Edit
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    variant="destructive"
+                                                    onClick={() => handleRemoveTeamMember(member.userId)}
+                                                    className="cursor-pointer"
+                                                >
+                                                    <Trash2 className="h-4 w-4 mr-1" />
+                                                    Remove
+                                                </Button>
+                                            </div>
                                         </div>
-                                        <p className="text-sm text-muted-foreground">
-                                            Invited: {new Date(member.invitedAt).toLocaleDateString()}
-                                            {member.acceptedAt && ` • Joined: ${new Date(member.acceptedAt).toLocaleDateString()}`}
-                                        </p>
                                     </div>
-                                    <div className="flex space-x-2">
-                                        {member.status === 'PENDING' && (
-                                            <Button size="sm" variant="outline">
-                                                Resend Invite
-                                            </Button>
-                                        )}
-                                        <Button
-                                            size="sm"
-                                            variant="destructive"
-                                            onClick={() => handleRemoveTeamMember(member.userId)}
-                                        >
-                                            Remove
-                                        </Button>
-                                    </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
                 </CardContent>
             </Card>
 
             {/* Team Permissions Guide */}
-            <Card>
+            <Card className="border-secondary/20 bg-gradient-to-r from-secondary/5 to-primary/5">
                 <CardHeader>
-                    <CardTitle>Role Permissions</CardTitle>
+                    <CardTitle className="flex items-center gap-2">
+                        <Settings className="h-5 w-5 text-primary" />
+                        Role Permissions Guide
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                        Understanding what each role can do in your team
+                    </p>
                 </CardHeader>
                 <CardContent>
-                    <div className="space-y-4">
-                        <div>
-                            <h4 className="font-medium text-sm">MEMBER</h4>
-                            <p className="text-sm text-muted-foreground">
-                                Can upload and manage their own media files. View basic analytics.
-                            </p>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="space-y-3 p-4 border border-border rounded-lg bg-background/50">
+                            <div className="flex items-center gap-2">
+                                <UserCheck className="h-5 w-5 text-blue-500" />
+                                <h4 className="font-medium text-sm text-foreground">Member</h4>
+                            </div>
+                            <ul className="text-sm text-muted-foreground space-y-1">
+                                <li>• Upload and manage own media files</li>
+                                <li>• View basic analytics</li>
+                                <li>• Access personal dashboard</li>
+                                <li>• Comment on shared content</li>
+                            </ul>
                         </div>
-                        <div>
-                            <h4 className="font-medium text-sm">MANAGER</h4>
-                            <p className="text-sm text-muted-foreground">
-                                All member permissions plus: manage all team media, access detailed analytics.
-                            </p>
+
+                        <div className="space-y-3 p-4 border border-border rounded-lg bg-background/50">
+                            <div className="flex items-center gap-2">
+                                <Shield className="h-5 w-5 text-orange-500" />
+                                <h4 className="font-medium text-sm text-foreground">Manager</h4>
+                            </div>
+                            <ul className="text-sm text-muted-foreground space-y-1">
+                                <li>• All member permissions</li>
+                                <li>• Manage all team media</li>
+                                <li>• Access detailed analytics</li>
+                                <li>• Organize team content</li>
+                                <li>• Review team activity</li>
+                            </ul>
                         </div>
-                        <div>
-                            <h4 className="font-medium text-sm">ADMIN</h4>
-                            <p className="text-sm text-muted-foreground">
-                                All manager permissions plus: invite/remove team members, access billing information.
-                            </p>
+
+                        <div className="space-y-3 p-4 border border-border rounded-lg bg-background/50">
+                            <div className="flex items-center gap-2">
+                                <Crown className="h-5 w-5 text-purple-500" />
+                                <h4 className="font-medium text-sm text-foreground">Admin</h4>
+                            </div>
+                            <ul className="text-sm text-muted-foreground space-y-1">
+                                <li>• All manager permissions</li>
+                                <li>• Invite/remove team members</li>
+                                <li>• Manage team roles</li>
+                                <li>• Access billing information</li>
+                                <li>• Full team administration</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div className="mt-6 p-4 bg-primary/10 rounded-lg border border-primary/20">
+                        <div className="flex items-start gap-3">
+                            <Crown className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+                            <div>
+                                <h5 className="font-medium text-sm text-foreground mb-1">Team Owner (You)</h5>
+                                <p className="text-sm text-muted-foreground">
+                                    As the team owner, you have unlimited access to all features and can manage the entire team.
+                                    You cannot be removed from the team and have full administrative privileges.
+                                </p>
+                            </div>
                         </div>
                     </div>
                 </CardContent>

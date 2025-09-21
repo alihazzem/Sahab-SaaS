@@ -75,13 +75,12 @@ export default async function AdminDashboard() {
                     <div className="p-4 bg-card border border-border rounded-lg">
                         <p className="text-sm text-muted-foreground">
                             <strong className="text-foreground">Plan:</strong> {adminCheck.subscription?.planName} |{' '}
-                            <strong className="text-foreground">Team Members:</strong> {adminCheck.teamMembers || 0}/{adminCheck.subscription?.teamMembersAllowed || 0}
+                            <strong className="text-foreground">Team Members:</strong> {adminCheck.teamMembers || 0}/{adminCheck.subscription?.teamMembersAllowed === -1 ? '∞' : adminCheck.subscription?.teamMembersAllowed || 0}
                         </p>
                     </div>
                 </div>
 
                 <AdminDashboardClient
-                    adminRole={adminCheck.role}
                     subscription={adminCheck.subscription}
                     teamMembersCount={adminCheck.teamMembers || 0}
                 />

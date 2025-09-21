@@ -1,8 +1,6 @@
-"use client"
+﻿"use client"
 
-import { useEffect, useState, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
-import { LogoutButton } from '@/components/ui/logout-button'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -10,8 +8,6 @@ import {
     Video,
     ImageIcon,
     Loader2,
-    Home,
-    ChevronRight,
     Upload,
     BarChart3,
     FolderOpen,
@@ -28,17 +24,21 @@ import { useToast } from '@/components/ui/toast'
 import type { MediaItem, SubscriptionData } from '@/types'
 
 export default function DashboardPage() {
-    const router = useRouter()
     const [media, setMedia] = useState<MediaItem[]>([])
     const [subscription, setSubscription] = useState<SubscriptionData | null>(null)
     const [loading, setLoading] = useState(true)
     const [mediaLoading, setMediaLoading] = useState(false)
-    const [uploading, setUploading] = useState(false)
     const [uploadModalOpen, setUploadModalOpen] = useState(false)
     const [uploadType, setUploadType] = useState<'video' | 'image'>('video')
-    const [progressTrackerMinimized, setProgressTrackerMinimized] = useState(false)
+    const [isUploadTrackerMinimized, setIsUploadTrackerMinimized] = useState(false)
 
     const { success, error } = useToast()
+    const errorRef = useRef(error)
+
+    // Update ref when error function changes
+    useEffect(() => {
+        errorRef.current = error
+    }, [error])
 
     // Background upload system
     const {
@@ -48,7 +48,6 @@ export default function DashboardPage() {
         clearCompleted
     } = useBackgroundUpload(
         (result) => {
-            // Handle successful upload
             if (result && typeof result === 'object' && 'data' in result) {
                 const uploadResult = result as { data: MediaItem, subscription?: SubscriptionData }
                 if (uploadResult.data) {
@@ -60,123 +59,46 @@ export default function DashboardPage() {
             }
         },
         (errorMessage) => {
-            // Handle upload error
             error('Upload failed', errorMessage)
         }
     )
 
-    const loadData = useCallback(async (retryCount = 0) => {
+    const loadData = useCallback(async () => {
         setLoading(true)
         try {
             const [mediaRes, subRes] = await Promise.all([
-                fetch('/api/media/list', {
-                    headers: {
-                        'Cache-Control': 'no-cache',
-                    }
-                }).then(async res => {
-                    if (!res.ok) {
-                        if (res.status === 401) {
-                            console.error('Media API: Unauthorized - status 401')
-                            // Retry once after a short delay in case of auth timing issue
-                            if (retryCount < 1) {
-                                await new Promise(resolve => setTimeout(resolve, 500))
-                                return { success: false, error: 'Retry' }
-                            }
-                            console.error('Media API: Still unauthorized after retry - redirecting to sign-in')
-                            router.push('/auth/sign-in')
-                            return { success: false, error: 'Unauthorized' }
-                        }
-                        const errorText = await res.text()
-                        console.error('Media API HTTP Error:', res.status, errorText)
-                        return { success: false, error: errorText }
-                    }
-                    return res.json()
-                }),
-                fetch('/api/subscription/status', {
-                    headers: {
-                        'Cache-Control': 'no-cache',
-                    }
-                }).then(async res => {
-                    if (!res.ok) {
-                        if (res.status === 401) {
-                            console.error('Subscription API: Unauthorized - status 401')
-                            // Retry once after a short delay in case of auth timing issue
-                            if (retryCount < 1) {
-                                await new Promise(resolve => setTimeout(resolve, 500))
-                                return { success: false, error: 'Retry' }
-                            }
-                            console.error('Subscription API: Still unauthorized after retry - redirecting to sign-in')
-                            router.push('/auth/sign-in')
-                            return { success: false, error: 'Unauthorized' }
-                        }
-                        const errorText = await res.text()
-                        console.error('Subscription API HTTP Error:', res.status, errorText)
-                        return { success: false, error: errorText }
-                    }
-                    return res.json()
-                })
+                fetch('/api/media/list').then(res => res.json()),
+                fetch('/api/subscription/status').then(res => res.json())
             ])
 
-            // If either API returned a retry error, retry the whole process
-            if (mediaRes.error === 'Retry' || subRes.error === 'Retry') {
-                return loadData(retryCount + 1)
-            }
-
-            // Don't continue if we got unauthorized responses
-            if (mediaRes.error === 'Unauthorized' || subRes.error === 'Unauthorized') {
-                return
-            }
-
             if (mediaRes.success) {
-                setMedia(mediaRes.data?.data || [])
+                setMedia(mediaRes.data || [])
             } else {
-                console.error('Media API error:', mediaRes.error || mediaRes)
+                console.error('Media API error:', mediaRes.error)
             }
 
             if (subRes.success) {
                 setSubscription(subRes.subscription)
             } else {
-                console.error('Subscription API error:', subRes.error || subRes)
+                console.error('Subscription API error:', subRes.error)
             }
 
-            // Only show error if both APIs failed (and not due to auth issues)
-            if (!mediaRes.success && !subRes.success &&
-                mediaRes.error !== 'Unauthorized' && subRes.error !== 'Unauthorized') {
-                error(
-                    'Failed to load dashboard',
-                    'There was an error loading your dashboard data. Please refresh the page.'
-                )
+            // Only show error if both APIs fail
+            if (!mediaRes.success && !subRes.success) {
+                errorRef.current('Failed to load data', 'Please refresh the page')
             }
         } catch (err) {
-            console.error('Failed to load dashboard data:', err)
-            error(
-                'Failed to load dashboard',
-                'There was an error loading your dashboard data. Please refresh the page.'
-            )
+            console.error('Data loading error:', err)
+            // Using a ref to avoid dependency issues
+            errorRef.current('Failed to load data', 'Please refresh the page')
         } finally {
             setLoading(false)
         }
-    }, [router, error]);
+    }, []) // Empty dependency array to prevent infinite loop
 
     useEffect(() => {
         loadData()
     }, [loadData])
-
-    const refreshMediaLibrary = async () => {
-        setMediaLoading(true)
-        try {
-            const mediaRes = await fetch('/api/media/list').then(res => res.json())
-            if (mediaRes.success) setMedia(mediaRes.data?.data || [])
-        } catch (err) {
-            console.error('Failed to refresh media:', err)
-            error(
-                'Failed to refresh media',
-                'There was an error refreshing your media library.'
-            )
-        } finally {
-            setMediaLoading(false)
-        }
-    }
 
     const handleVideoUpload = () => {
         setUploadType('video')
@@ -188,44 +110,17 @@ export default function DashboardPage() {
         setUploadModalOpen(true)
     }
 
-    const handleUpload = async (file: File, title: string, description?: string) => {
-        setUploading(true)
-
-        try {
-            // Start background upload
-            await startUpload(file, title, description, uploadType)
-
-            // Show success message and close modal
-            success('Upload started!', `Your ${uploadType} is uploading in the background.`)
-            setUploadModalOpen(false)
-        } catch (err) {
-            console.error('Upload error:', err)
-            // Error is already handled by the background upload system
-        } finally {
-            setUploading(false)
-        }
-    }
-
-    const handleMinimizeUpload = () => {
-        setUploadModalOpen(false)
-        setProgressTrackerMinimized(false) // Show the progress tracker
-    }
-
     const handleDelete = async (id: string) => {
         try {
-            const response = await fetch('/api/media/delete', {
+            const response = await fetch(`/api/media/delete/${id}`, {
                 method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id }),
             })
-
             const result = await response.json()
 
             if (result.success) {
-                success('Deleted successfully', 'Media file has been deleted.')
                 setMedia(prev => prev.filter(item => item.id !== id))
+                success('Deleted successfully', 'Media file has been deleted.')
 
-                // Update subscription state if provided
                 if (result.subscription) {
                     setSubscription(result.subscription)
                 }
@@ -239,95 +134,67 @@ export default function DashboardPage() {
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary/10">
-            {/* Header Section */}
-            <div className="border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-                <div className="container mx-auto px-4 py-4 sm:py-6">
-                    {/* Top Header with Profile/Logout */}
-                    <div className="flex items-center justify-between mb-4">
-                        {/* Breadcrumb */}
-                        <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                            <Home className="h-4 w-4" />
-                            <ChevronRight className="h-4 w-4" />
-                            <span className="text-foreground font-medium">Dashboard</span>
-                        </div>
-
-                        {/* Profile & Logout */}
-                        <div className="flex items-center gap-3">
-                            <UploadStatusIndicator
-                                activeUploads={uploadTasks.filter(task => task.status === 'uploading').length}
-                            />
-                            <LogoutButton />
-                        </div>
+        <div className="p-4 lg:p-6 space-y-6">
+            {/* Main Header */}
+            <div className="flex flex-col space-y-4 lg:flex-row lg:justify-between lg:items-center lg:space-y-0 gap-4 lg:gap-6">
+                <div className="space-y-2">
+                    <div className="flex items-center gap-2 sm:gap-3">
+                        <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                            Welcome back
+                        </h1>
+                        <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 text-primary flex-shrink-0" />
                     </div>
+                    <p className="text-muted-foreground text-base sm:text-lg">
+                        Manage your media files and track your usage
+                    </p>
 
-                    {/* Main Header */}
-                    <div className="flex flex-col space-y-4 lg:flex-row lg:justify-between lg:items-center lg:space-y-0 gap-4 lg:gap-6">
-                        <div className="space-y-2">
-                            <div className="flex items-center gap-2 sm:gap-3">
-                                <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-                                    Welcome back
-                                </h1>
-                                <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 text-primary flex-shrink-0" />
+                    {/* Quick Stats */}
+                    {!loading && subscription && (
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 pt-2">
+                            <div className="flex items-center gap-2">
+                                <FolderOpen className="h-4 w-4 text-muted-foreground" />
+                                <span className="text-sm text-muted-foreground">
+                                    {media.length} {media.length === 1 ? 'file' : 'files'}
+                                </span>
                             </div>
-                            <p className="text-muted-foreground text-base sm:text-lg">
-                                Manage your media files and track your usage
-                            </p>
-
-                            {/* Quick Stats */}
-                            {!loading && subscription && (
-                                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 pt-2">
-                                    <div className="flex items-center gap-2">
-                                        <FolderOpen className="h-4 w-4 text-muted-foreground" />
-                                        <span className="text-sm text-muted-foreground">
-                                            {media.length} {media.length === 1 ? 'file' : 'files'}
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                                        <span className="text-sm text-muted-foreground">
-                                            {subscription.plan.name} Plan
-                                        </span>
-                                        <Badge variant={subscription.plan.name === 'Free' ? 'secondary' : 'default'} className="text-xs">
-                                            {subscription.plan.name === 'Free' ? 'Starter' : 'Pro'}
-                                        </Badge>
-                                    </div>
-                                </div>
-                            )}
+                            <div className="flex items-center gap-2">
+                                <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                                <span className="text-sm text-muted-foreground">
+                                    {subscription.plan.name} Plan
+                                </span>
+                                <Badge variant={subscription.plan.name === 'Free' ? 'secondary' : 'default'} className="text-xs">
+                                    {subscription.plan.name === 'Free' ? 'Starter' : 'Pro'}
+                                </Badge>
+                            </div>
                         </div>
+                    )}
+                </div>
 
-                        {/* Action Buttons */}
-                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
-                            <Button
-                                onClick={handleVideoUpload}
-                                className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer w-full sm:w-auto"
-                            >
-                                <Plus className="h-4 w-4 mr-2" />
-                                Upload Video
-                            </Button>
-                            <Button
-                                onClick={handleImageUpload}
-                                variant="outline"
-                                className="border-border hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer w-full sm:w-auto"
-                            >
-                                <Plus className="h-4 w-4 mr-2" />
-                                Upload Image
-                            </Button>
-                            <Button
-                                onClick={() => router.push('/subscription')}
-                                variant="outline"
-                                className="border-border hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer w-full sm:w-auto"
-                            >
-                                <BarChart3 className="h-4 w-4 mr-2" />
-                                Manage Plan
-                            </Button>
-                        </div>
-                    </div>
+                {/* Action Buttons */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+                    <UploadStatusIndicator
+                        activeUploads={uploadTasks.filter(task => task.status === 'uploading').length}
+                    />
+                    <Button
+                        onClick={handleVideoUpload}
+                        className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer w-full sm:w-auto"
+                    >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Upload Video
+                    </Button>
+                    <Button
+                        onClick={handleImageUpload}
+                        variant="outline"
+                        className="border-border hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer w-full sm:w-auto"
+                    >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Upload Image
+                    </Button>
                 </div>
             </div>
 
             {/* Main Content */}
-            <div className="container mx-auto px-4 py-6 sm:py-8">
+            <div className="space-y-6">
                 {loading ? (
                     <div className="flex items-center justify-center py-12 sm:py-16">
                         <div className="text-center max-w-md px-4">
@@ -337,7 +204,7 @@ export default function DashboardPage() {
                             </div>
                             <h3 className="text-base sm:text-lg font-semibold mb-2">Setting up your dashboard...</h3>
                             <p className="text-muted-foreground mb-4 text-sm sm:text-base">
-                                We&apos;re loading your media files and usage statistics
+                                We are loading your media files and usage statistics
                             </p>
                             <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
                                 <Sparkles className="h-3 w-3" />
@@ -347,7 +214,32 @@ export default function DashboardPage() {
                     </div>
                 ) : (
                     <div className="space-y-6 sm:space-y-8">
-                        {/* Quick Actions Section */}
+                        {/* Usage Analytics */}
+                        {subscription && (
+                            <section>
+                                <div className="flex items-center gap-2 mb-6">
+                                    <BarChart3 className="h-5 w-5 text-primary" />
+                                    <h2 className="text-lg sm:text-xl font-semibold">Usage & Plan Analytics</h2>
+                                    <Badge variant="secondary" className="text-xs">
+                                        {subscription.plan.name} Plan
+                                    </Badge>
+                                </div>
+                                <UsageAnalytics subscription={subscription} />
+                            </section>
+                        )}
+
+                        {/* Upload Progress */}
+                        {uploadTasks.length > 0 && (
+                            <UploadProgressTracker
+                                tasks={uploadTasks}
+                                isMinimized={isUploadTrackerMinimized}
+                                onToggleMinimize={() => setIsUploadTrackerMinimized(!isUploadTrackerMinimized)}
+                                onRemoveTask={removeTask}
+                                onClearCompleted={clearCompleted}
+                            />
+                        )}
+
+                        {/* Quick Upload Section */}
                         <section>
                             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
                                 <div className="flex items-center gap-2">
@@ -360,52 +252,8 @@ export default function DashboardPage() {
                             </div>
 
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-                                {/* Team Management Card - For Pro/Enterprise subscribers */}
-                                {subscription && ['Pro', 'Enterprise', 'pro', 'enterprise'].includes(subscription.plan.name) && (
-                                    <Card className="group border-border hover:border-primary/50 hover:shadow-lg transition-all duration-300 cursor-pointer bg-gradient-to-br from-card to-card/50"
-                                        onClick={() => router.push('/admin')}>
-                                        <CardHeader className="pb-3">
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center space-x-3 min-w-0 flex-1">
-                                                    <div className="p-2 bg-purple-500/10 rounded-lg group-hover:bg-purple-500/20 transition-colors flex-shrink-0">
-                                                        <BarChart3 className="h-5 w-5 sm:h-6 sm:w-6 text-purple-500" />
-                                                    </div>
-                                                    <div className="min-w-0">
-                                                        <CardTitle className="text-base sm:text-lg truncate">Team Management</CardTitle>
-                                                        <p className="text-xs text-muted-foreground mt-1 truncate">
-                                                            Manage team members & access
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                                <Plus className="h-6 w-6 sm:h-8 sm:w-8 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0" />
-                                            </div>
-                                        </CardHeader>
-                                        <CardContent className="pt-0">
-                                            <div className="space-y-2">
-                                                <div className="text-xs sm:text-sm text-muted-foreground">
-                                                    • Invite team members
-                                                </div>
-                                                <div className="text-xs sm:text-sm text-muted-foreground">
-                                                    • Manage roles & permissions
-                                                </div>
-                                                <div className="text-xs sm:text-sm text-muted-foreground">
-                                                    • Control team access
-                                                </div>
-                                            </div>
-                                            <div className="mt-4 pt-3 border-t border-border/50">
-                                                <span className="text-xs text-purple-600 font-medium">
-                                                    {subscription.plan.name} Feature
-                                                </span>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                )}
-
                                 {/* Video Upload Card */}
-                                <Card className={`group border-border hover:border-primary/50 hover:shadow-lg transition-all duration-300 cursor-pointer bg-gradient-to-br from-card to-card/50 ${uploadTasks.some(task => task.type === 'video' && task.status === 'uploading')
-                                    ? 'ring-2 ring-blue-500/20 bg-blue-50/5'
-                                    : ''
-                                    }`}
+                                <Card className="group border-border hover:border-primary/50 hover:shadow-lg transition-all duration-300 cursor-pointer bg-gradient-to-br from-card to-card/50"
                                     onClick={handleVideoUpload}>
                                     <CardHeader className="pb-3">
                                         <div className="flex items-center justify-between">
@@ -414,9 +262,9 @@ export default function DashboardPage() {
                                                     <Video className="h-5 w-5 sm:h-6 sm:w-6 text-blue-500" />
                                                 </div>
                                                 <div className="min-w-0">
-                                                    <CardTitle className="text-base sm:text-lg truncate">Upload Video</CardTitle>
+                                                    <CardTitle className="text-base sm:text-lg truncate">Video Upload</CardTitle>
                                                     <p className="text-xs text-muted-foreground mt-1 truncate">
-                                                        MP4, MOV, AVI supported
+                                                        MP4, MOV, AVI files supported
                                                     </p>
                                                 </div>
                                             </div>
@@ -426,28 +274,25 @@ export default function DashboardPage() {
                                     <CardContent className="pt-0">
                                         <div className="space-y-2">
                                             <div className="text-xs sm:text-sm text-muted-foreground">
-                                                • Automatic thumbnail generation
+                                                Drag & drop support
                                             </div>
                                             <div className="text-xs sm:text-sm text-muted-foreground">
-                                                • Video compression & optimization
+                                                Auto-optimization
                                             </div>
                                             <div className="text-xs sm:text-sm text-muted-foreground">
-                                                • Multiple format support
+                                                Multiple formats
                                             </div>
                                         </div>
                                         <div className="mt-4 pt-3 border-t border-border/50">
-                                            <span className="text-xs text-muted-foreground">
-                                                Click to upload or drag & drop
+                                            <span className="text-xs text-blue-600 font-medium">
+                                                Click to upload
                                             </span>
                                         </div>
                                     </CardContent>
                                 </Card>
 
                                 {/* Image Upload Card */}
-                                <Card className={`group border-border hover:border-primary/50 hover:shadow-lg transition-all duration-300 cursor-pointer bg-gradient-to-br from-card to-card/50 ${uploadTasks.some(task => task.type === 'image' && task.status === 'uploading')
-                                    ? 'ring-2 ring-green-500/20 bg-green-50/5'
-                                    : ''
-                                    }`}
+                                <Card className="group border-border hover:border-primary/50 hover:shadow-lg transition-all duration-300 cursor-pointer bg-gradient-to-br from-card to-card/50"
                                     onClick={handleImageUpload}>
                                     <CardHeader className="pb-3">
                                         <div className="flex items-center justify-between">
@@ -456,9 +301,9 @@ export default function DashboardPage() {
                                                     <ImageIcon className="h-5 w-5 sm:h-6 sm:w-6 text-green-500" />
                                                 </div>
                                                 <div className="min-w-0">
-                                                    <CardTitle className="text-base sm:text-lg truncate">Upload Image</CardTitle>
+                                                    <CardTitle className="text-base sm:text-lg truncate">Image Upload</CardTitle>
                                                     <p className="text-xs text-muted-foreground mt-1 truncate">
-                                                        JPG, PNG, WebP supported
+                                                        JPG, PNG, GIF files supported
                                                     </p>
                                                 </div>
                                             </div>
@@ -468,18 +313,18 @@ export default function DashboardPage() {
                                     <CardContent className="pt-0">
                                         <div className="space-y-2">
                                             <div className="text-xs sm:text-sm text-muted-foreground">
-                                                • Automatic image optimization
+                                                High-quality compression
                                             </div>
                                             <div className="text-xs sm:text-sm text-muted-foreground">
-                                                • Smart resize & compression
+                                                Instant preview
                                             </div>
                                             <div className="text-xs sm:text-sm text-muted-foreground">
-                                                • Multiple format conversion
+                                                Multiple formats
                                             </div>
                                         </div>
                                         <div className="mt-4 pt-3 border-t border-border/50">
-                                            <span className="text-xs text-muted-foreground">
-                                                Click to upload or drag & drop
+                                            <span className="text-xs text-green-600 font-medium">
+                                                Click to upload
                                             </span>
                                         </div>
                                     </CardContent>
@@ -487,37 +332,38 @@ export default function DashboardPage() {
                             </div>
                         </section>
 
-                        {/* Usage Analytics */}
-                        {subscription && (
-                            <section>
-                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-                                    <div className="flex items-center gap-2">
-                                        <BarChart3 className="h-5 w-5 text-primary" />
-                                        <h2 className="text-lg sm:text-xl font-semibold">Usage Analytics</h2>
-                                        <Badge variant="outline" className="text-xs hidden sm:inline-flex">
-                                            Real-time
-                                        </Badge>
-                                    </div>
-                                </div>
-                                <UsageAnalytics subscription={subscription} />
-                            </section>
-                        )}
-
-                        {/* Media Library */}
+                        {/* Media Library Section */}
                         <section>
-                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mb-6">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
                                 <div className="flex items-center gap-2">
                                     <FolderOpen className="h-5 w-5 text-primary" />
                                     <h2 className="text-lg sm:text-xl font-semibold">Media Library</h2>
+                                    <Badge variant="secondary" className="text-xs">
+                                        {media.length} {media.length === 1 ? 'file' : 'files'}
+                                    </Badge>
                                 </div>
-                                <Badge variant="outline" className="text-xs self-start sm:self-auto">
-                                    {media.length} {media.length === 1 ? 'file' : 'files'}
-                                </Badge>
+                                <Button
+                                    onClick={() => {
+                                        setMediaLoading(true)
+                                        loadData().finally(() => setMediaLoading(false))
+                                    }}
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={mediaLoading}
+                                    className="w-full sm:w-auto"
+                                >
+                                    {mediaLoading ? (
+                                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                    ) : (
+                                        <Upload className="h-4 w-4 mr-2" />
+                                    )}
+                                    Refresh
+                                </Button>
                             </div>
+
                             <MediaLibrary
                                 media={media}
                                 loading={mediaLoading}
-                                onRefresh={refreshMediaLibrary}
                                 onDelete={handleDelete}
                             />
                         </section>
@@ -529,19 +375,9 @@ export default function DashboardPage() {
             <UploadModal
                 isOpen={uploadModalOpen}
                 onClose={() => setUploadModalOpen(false)}
-                onUpload={handleUpload}
-                onMinimize={handleMinimizeUpload}
-                uploading={uploading}
                 type={uploadType}
-            />
-
-            {/* Background Upload Progress Tracker */}
-            <UploadProgressTracker
-                tasks={uploadTasks}
-                isMinimized={progressTrackerMinimized}
-                onToggleMinimize={() => setProgressTrackerMinimized(!progressTrackerMinimized)}
-                onRemoveTask={removeTask}
-                onClearCompleted={clearCompleted}
+                onUpload={(file: File, title: string, description?: string) => startUpload(file, title, description, uploadType)}
+                uploading={uploadTasks.some(task => task.status === 'uploading')}
             />
         </div>
     )

@@ -94,7 +94,7 @@ export function UsageAnalytics({ subscription }: UsageAnalyticsProps) {
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         <div className="space-y-1">
                             <div className="flex items-center gap-2 text-sm font-medium">
                                 <FileImage className="h-4 w-4 text-blue-500" />
@@ -146,9 +146,9 @@ export function UsageAnalytics({ subscription }: UsageAnalyticsProps) {
                 </CardContent>
             </Card>
 
-            <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
                 {/* Storage Usage */}
-                <Card className="group hover:shadow-lg transition-all duration-300 border-border hover:border-primary/30 bg-gradient-to-br from-card to-card/50">
+                <Card className="group hover:shadow-lg transition-all duration-300 border-border hover:border-primary/30 bg-gradient-to-br from-card to-card/50 min-w-0">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                         <CardTitle className="text-sm font-medium">Storage Usage</CardTitle>
                         <div className="p-2 bg-blue-500/10 rounded-lg group-hover:bg-blue-500/20 transition-colors">
@@ -185,7 +185,7 @@ export function UsageAnalytics({ subscription }: UsageAnalyticsProps) {
                 </Card>
 
                 {/* Transformations Usage */}
-                <Card className="group hover:shadow-lg transition-all duration-300 border-border hover:border-primary/30 bg-gradient-to-br from-card to-card/50">
+                <Card className="group hover:shadow-lg transition-all duration-300 border-border hover:border-primary/30 bg-gradient-to-br from-card to-card/50 min-w-0">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                         <CardTitle className="text-sm font-medium">Transformations</CardTitle>
                         <div className="p-2 bg-yellow-500/10 rounded-lg group-hover:bg-yellow-500/20 transition-colors">
@@ -231,7 +231,7 @@ export function UsageAnalytics({ subscription }: UsageAnalyticsProps) {
                 </Card>
 
                 {/* Uploads This Month */}
-                <Card className="group hover:shadow-lg transition-all duration-300 border-border hover:border-primary/30 bg-gradient-to-br from-card to-card/50">
+                <Card className="group hover:shadow-lg transition-all duration-300 border-border hover:border-primary/30 bg-gradient-to-br from-card to-card/50 min-w-0">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                         <CardTitle className="text-sm font-medium">Videos Uploaded</CardTitle>
                         <div className="p-2 bg-green-500/10 rounded-lg group-hover:bg-green-500/20 transition-colors">
@@ -257,7 +257,7 @@ export function UsageAnalytics({ subscription }: UsageAnalyticsProps) {
                 </Card>
 
                 {/* Current Plan */}
-                <Card className="group hover:shadow-lg transition-all duration-300 border-border hover:border-primary/30 bg-gradient-to-br from-card to-card/50">
+                <Card className="group hover:shadow-lg transition-all duration-300 border-border hover:border-primary/30 bg-gradient-to-br from-card to-card/50 min-w-0">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                         <CardTitle className="text-sm font-medium">Current Plan</CardTitle>
                         <div className="p-2 bg-purple-500/10 rounded-lg group-hover:bg-purple-500/20 transition-colors">
