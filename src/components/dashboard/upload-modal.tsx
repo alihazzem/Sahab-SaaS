@@ -122,8 +122,10 @@ export function UploadModal({
         if (!selectedFile || !title.trim()) return
 
         try {
-            await onUpload(selectedFile, title.trim(), description.trim() || undefined)
+            // Close modal immediately when upload starts
             handleClose()
+            // Start upload in background
+            await onUpload(selectedFile, title.trim(), description.trim() || undefined)
         } catch (error) {
             console.error('Upload error:', error)
         }

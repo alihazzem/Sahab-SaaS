@@ -18,16 +18,22 @@ import {
     Eye,
     Calendar,
     Sparkles,
-    FolderOpen
+    FolderOpen,
+    Trash2
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { MediaItemSkeleton } from '@/components/ui/loading'
+import { useToast } from '@/components/ui/toast'
 import type { MediaLibraryProps } from '@/types'
 
 export function MediaLibrary({ media, onRefresh, loading = false }: MediaLibraryProps & { loading?: boolean }) {
     const [searchTerm, setSearchTerm] = useState('')
     const [filterType, setFilterType] = useState<'all' | 'video' | 'image'>('all')
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+    const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
+    const [confirmDelete, setConfirmDelete] = useState<{ id: string; title: string } | null>(null)
+
+    const { success, error: showError } = useToast()
 
     // Ensure media is always an array
     const mediaArray = Array.isArray(media) ? media : []
@@ -59,6 +65,54 @@ export function MediaLibrary({ media, onRefresh, loading = false }: MediaLibrary
 
     const handleView = (url: string) => {
         window.open(url, '_blank')
+    }
+
+    const handleDelete = async (id: string, title: string) => {
+        setDeletingIds(prev => new Set(prev).add(id))
+
+        try {
+            const response = await fetch(`/api/media/delete?id=${id}`, {
+                method: 'DELETE',
+            })
+
+            const data = await response.json()
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to delete media')
+            }
+
+            // Show success message
+            success('Media deleted', `"${title}" has been deleted successfully`)
+
+            // Refresh the media list after successful deletion
+            if (onRefresh) {
+                onRefresh()
+            }
+        } catch (error) {
+            console.error('Delete error:', error)
+            showError('Delete failed', error instanceof Error ? error.message : 'Failed to delete media file')
+        } finally {
+            setDeletingIds(prev => {
+                const newSet = new Set(prev)
+                newSet.delete(id)
+                return newSet
+            })
+        }
+    }
+
+    const initiateDelete = (id: string, title: string) => {
+        setConfirmDelete({ id, title })
+    }
+
+    const cancelDelete = () => {
+        setConfirmDelete(null)
+    }
+
+    const confirmDeleteAction = () => {
+        if (confirmDelete) {
+            handleDelete(confirmDelete.id, confirmDelete.title)
+            setConfirmDelete(null)
+        }
     }
 
     if (mediaArray.length === 0 && !loading) {
@@ -95,226 +149,289 @@ export function MediaLibrary({ media, onRefresh, loading = false }: MediaLibrary
     }
 
     return (
-        <Card className="overflow-hidden bg-gradient-to-br from-card to-card/50">
-            <CardHeader className="bg-muted/30 py-5 px-4 sm:px-6">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    <div className="min-w-0 flex-1">
-                        <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-                            <FolderOpen className="h-5 w-5 text-primary flex-shrink-0" />
-                            <span className="truncate">Media Library</span>
-                            {!loading && (
-                                <Badge variant="outline" className="text-xs flex-shrink-0">
-                                    {filteredMedia.length} of {mediaArray.length} files
-                                </Badge>
-                            )}
-                        </CardTitle>
-                        <CardDescription className="mt-1 text-sm">
-                            {loading ? 'Loading your media files...' : 'Manage and organize your uploaded content'}
-                        </CardDescription>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                        {/* View Toggle */}
-                        <div className="flex items-center bg-muted rounded-lg p-1">
-                            <Button
-                                variant={viewMode === 'grid' ? 'default' : 'ghost'}
-                                size="sm"
-                                onClick={() => setViewMode('grid')}
-                                className="h-8 w-8 p-0 cursor-pointer"
-                            >
-                                <Grid3X3 className="h-4 w-4" />
-                            </Button>
-                            <Button
-                                variant={viewMode === 'list' ? 'default' : 'ghost'}
-                                size="sm"
-                                onClick={() => setViewMode('list')}
-                                className="h-8 w-8 p-0 cursor-pointer"
-                            >
-                                <List className="h-4 w-4" />
-                            </Button>
+        <>
+            <Card className="overflow-hidden bg-gradient-to-br from-card to-card/50">
+                <CardHeader className="bg-muted/30 py-5 px-4 sm:px-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div className="min-w-0 flex-1">
+                            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                                <FolderOpen className="h-5 w-5 text-primary flex-shrink-0" />
+                                <span className="truncate">Media Library</span>
+                                {!loading && (
+                                    <Badge variant="outline" className="text-xs flex-shrink-0">
+                                        {filteredMedia.length} of {mediaArray.length} files
+                                    </Badge>
+                                )}
+                            </CardTitle>
+                            <CardDescription className="mt-1 text-sm">
+                                {loading ? 'Loading your media files...' : 'Manage and organize your uploaded content'}
+                            </CardDescription>
                         </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                            {/* View Toggle */}
+                            <div className="flex items-center bg-muted rounded-lg p-1">
+                                <Button
+                                    variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                                    size="sm"
+                                    onClick={() => setViewMode('grid')}
+                                    className="h-8 w-8 p-0 cursor-pointer"
+                                >
+                                    <Grid3X3 className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                    variant={viewMode === 'list' ? 'default' : 'ghost'}
+                                    size="sm"
+                                    onClick={() => setViewMode('list')}
+                                    className="h-8 w-8 p-0 cursor-pointer"
+                                >
+                                    <List className="h-4 w-4" />
+                                </Button>
+                            </div>
 
-                        {/* Refresh Button */}
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={onRefresh}
-                            disabled={loading}
-                            className="cursor-pointer hover:bg-primary/10"
-                        >
-                            {loading ? (
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            ) : (
-                                <Upload className="h-4 w-4 mr-2" />
-                            )}
-                            {loading ? 'Loading...' : 'Refresh'}
-                        </Button>
-                    </div>
-                </div>
-
-                {/* Search and Filter Controls */}
-                {!loading && (
-                    <div className="flex flex-col sm:flex-row gap-3 pt-4">
-                        <div className="relative flex-1">
-                            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                placeholder="Search files by name..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="pl-10 bg-background/50"
-                            />
-                        </div>
-                        <div className="flex flex-wrap gap-2">
+                            {/* Refresh Button */}
                             <Button
-                                variant={filterType === 'all' ? 'default' : 'outline'}
+                                variant="outline"
                                 size="sm"
-                                onClick={() => setFilterType('all')}
-                                className="cursor-pointer text-xs sm:text-sm"
+                                onClick={onRefresh}
+                                disabled={loading}
+                                className="cursor-pointer hover:bg-primary/10"
                             >
-                                All Files
-                            </Button>
-                            <Button
-                                variant={filterType === 'video' ? 'default' : 'outline'}
-                                size="sm"
-                                onClick={() => setFilterType('video')}
-                                className="cursor-pointer text-xs sm:text-sm"
-                            >
-                                <Video className="h-3 w-3 mr-1" />
-                                <span className="hidden xs:inline">Videos</span>
-                                <span className="xs:hidden">Video</span>
-                            </Button>
-                            <Button
-                                variant={filterType === 'image' ? 'default' : 'outline'}
-                                size="sm"
-                                onClick={() => setFilterType('image')}
-                                className="cursor-pointer text-xs sm:text-sm"
-                            >
-                                <ImageIcon className="h-3 w-3 mr-1" />
-                                <span className="hidden xs:inline">Images</span>
-                                <span className="xs:hidden">Image</span>
+                                {loading ? (
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                ) : (
+                                    <Upload className="h-4 w-4 mr-2" />
+                                )}
+                                {loading ? 'Loading...' : 'Refresh'}
                             </Button>
                         </div>
                     </div>
-                )}
-            </CardHeader>
 
-            <CardContent className="p-4 sm:p-6">
-                {loading ? (
-                    <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                        {Array.from({ length: 6 }).map((_, index) => (
-                            <MediaItemSkeleton key={index} />
-                        ))}
-                    </div>
-                ) : (
-                    <div className={viewMode === 'grid' ? 'grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' : 'space-y-3'}>
-                        {filteredMedia.map((item) => (
-                            <div
-                                key={item.id}
-                                className={`group border border-border rounded-xl p-3 sm:p-4 lg:p-5 hover:bg-accent/30 hover:border-primary/30 hover:shadow-lg transition-all duration-300 ${viewMode === 'list' ? 'flex flex-col gap-3' : ''
-                                    }`}
-                            >
-                                {/* File header */}
-                                <div className={`flex items-start justify-between ${viewMode === 'list' ? 'flex-1' : 'mb-3'}`}>
-                                    <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
-                                        <div className={`p-1.5 sm:p-2 rounded-lg flex-shrink-0 ${item.type === 'video' ? 'bg-blue-500/10' : 'bg-green-500/10'}`}>
-                                            {item.type === 'video' ? (
-                                                <Video className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 text-blue-500" />
-                                            ) : (
-                                                <ImageIcon className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 text-green-500" />
-                                            )}
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                            <h4 className="font-semibold truncate text-xs sm:text-sm group-hover:text-primary transition-colors" title={item.title || 'Untitled'}>
-                                                {item.title || 'Untitled'}
-                                            </h4>
-                                            <div className="flex flex-col xs:flex-row xs:items-center gap-1 mt-1">
-                                                <Badge variant="secondary" className="text-xs self-start">
-                                                    {item.type}
-                                                </Badge>
-                                                <span className="text-xs text-muted-foreground">
-                                                    {formatFileSize(item.originalSize)}
-                                                </span>
+                    {/* Search and Filter Controls */}
+                    {!loading && (
+                        <div className="flex flex-col sm:flex-row gap-3 pt-4">
+                            <div className="relative flex-1">
+                                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    placeholder="Search files by name..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="pl-10 bg-background/50"
+                                />
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                <Button
+                                    variant={filterType === 'all' ? 'default' : 'outline'}
+                                    size="sm"
+                                    onClick={() => setFilterType('all')}
+                                    className="cursor-pointer text-xs sm:text-sm"
+                                >
+                                    All Files
+                                </Button>
+                                <Button
+                                    variant={filterType === 'video' ? 'default' : 'outline'}
+                                    size="sm"
+                                    onClick={() => setFilterType('video')}
+                                    className="cursor-pointer text-xs sm:text-sm"
+                                >
+                                    <Video className="h-3 w-3 mr-1" />
+                                    <span className="hidden xs:inline">Videos</span>
+                                    <span className="xs:hidden">Video</span>
+                                </Button>
+                                <Button
+                                    variant={filterType === 'image' ? 'default' : 'outline'}
+                                    size="sm"
+                                    onClick={() => setFilterType('image')}
+                                    className="cursor-pointer text-xs sm:text-sm"
+                                >
+                                    <ImageIcon className="h-3 w-3 mr-1" />
+                                    <span className="hidden xs:inline">Images</span>
+                                    <span className="xs:hidden">Image</span>
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                </CardHeader>
+
+                <CardContent className="p-4 sm:p-6">
+                    {loading ? (
+                        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                            {Array.from({ length: 6 }).map((_, index) => (
+                                <MediaItemSkeleton key={index} />
+                            ))}
+                        </div>
+                    ) : (
+                        <div className={viewMode === 'grid' ? 'grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' : 'space-y-3'}>
+                            {filteredMedia.map((item) => (
+                                <div
+                                    key={item.id}
+                                    className={`group border border-border rounded-xl p-3 sm:p-4 lg:p-5 hover:bg-accent/30 hover:border-primary/30 hover:shadow-lg transition-all duration-300 ${viewMode === 'list' ? 'flex flex-col gap-3' : ''
+                                        }`}
+                                >
+                                    {/* File header */}
+                                    <div className={`flex items-start justify-between ${viewMode === 'list' ? 'flex-1' : 'mb-3'}`}>
+                                        <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
+                                            <div className={`p-1.5 sm:p-2 rounded-lg flex-shrink-0 ${item.type === 'video' ? 'bg-blue-500/10' : 'bg-green-500/10'}`}>
+                                                {item.type === 'video' ? (
+                                                    <Video className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 text-blue-500" />
+                                                ) : (
+                                                    <ImageIcon className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 text-green-500" />
+                                                )}
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <h4 className="font-semibold truncate text-xs sm:text-sm group-hover:text-primary transition-colors" title={item.title || 'Untitled'}>
+                                                    {item.title || 'Untitled'}
+                                                </h4>
+                                                <div className="flex flex-col xs:flex-row xs:items-center gap-1 mt-1">
+                                                    <Badge variant="secondary" className="text-xs self-start">
+                                                        {item.type}
+                                                    </Badge>
+                                                    <span className="text-xs text-muted-foreground">
+                                                        {formatFileSize(item.originalSize)}
+                                                    </span>
+                                                </div>
                                             </div>
                                         </div>
+                                        {viewMode === 'grid' && (
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => handleView(item.url)}
+                                                className="opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer flex-shrink-0 hidden sm:flex"
+                                            >
+                                                <Eye className="h-4 w-4" />
+                                            </Button>
+                                        )}
                                     </div>
+
+                                    {/* File details */}
                                     {viewMode === 'grid' && (
+                                        <div className="space-y-1 sm:space-y-2 text-xs text-muted-foreground mb-3 sm:mb-4">
+                                            {item.type === 'video' && item.duration && (
+                                                <div className="flex items-center gap-1">
+                                                    <Video className="h-3 w-3 flex-shrink-0" />
+                                                    <span className="truncate">Duration: {item.duration}s</span>
+                                                </div>
+                                            )}
+                                            {item.width && item.height && (
+                                                <div className="flex items-center gap-1">
+                                                    <ImageIcon className="h-3 w-3 flex-shrink-0" />
+                                                    <span className="truncate">{item.width} × {item.height}</span>
+                                                </div>
+                                            )}
+                                            <div className="flex items-center gap-1">
+                                                <Calendar className="h-3 w-3 flex-shrink-0" />
+                                                <span className="truncate">{formatDate(item.createdAt)}</span>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Actions */}
+                                    <div className={`flex gap-1.5 sm:gap-2 ${viewMode === 'list' ? 'ml-auto' : ''}`}>
                                         <Button
-                                            variant="ghost"
+                                            variant="outline"
                                             size="sm"
                                             onClick={() => handleView(item.url)}
-                                            className="opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer flex-shrink-0 hidden sm:flex"
+                                            className="flex-1 cursor-pointer hover:bg-primary/10 hover:border-primary/30 text-xs sm:text-sm px-2 sm:px-3"
                                         >
-                                            <Eye className="h-4 w-4" />
+                                            <ExternalLink className="h-3 w-3 mr-1" />
+                                            <span className="">View</span>
                                         </Button>
-                                    )}
-                                </div>
-
-                                {/* File details */}
-                                {viewMode === 'grid' && (
-                                    <div className="space-y-1 sm:space-y-2 text-xs text-muted-foreground mb-3 sm:mb-4">
-                                        {item.type === 'video' && item.duration && (
-                                            <div className="flex items-center gap-1">
-                                                <Video className="h-3 w-3 flex-shrink-0" />
-                                                <span className="truncate">Duration: {item.duration}s</span>
-                                            </div>
-                                        )}
-                                        {item.width && item.height && (
-                                            <div className="flex items-center gap-1">
-                                                <ImageIcon className="h-3 w-3 flex-shrink-0" />
-                                                <span className="truncate">{item.width} × {item.height}</span>
-                                            </div>
-                                        )}
-                                        <div className="flex items-center gap-1">
-                                            <Calendar className="h-3 w-3 flex-shrink-0" />
-                                            <span className="truncate">{formatDate(item.createdAt)}</span>
-                                        </div>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => handleDownload(item.url, item.title || 'download')}
+                                            className="flex-1 cursor-pointer hover:bg-primary/10 hover:border-primary/30 text-xs sm:text-sm px-2 sm:px-3"
+                                        >
+                                            <Download className="h-3 w-3 mr-1" />
+                                            <span className="">Download</span>
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => initiateDelete(item.id, item.title || 'Untitled')}
+                                            disabled={deletingIds.has(item.id)}
+                                            className="flex-1 cursor-pointer hover:bg-destructive/10 hover:border-destructive/30 hover:text-destructive text-xs sm:text-sm px-2 sm:px-3"
+                                        >
+                                            {deletingIds.has(item.id) ? (
+                                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                            ) : (
+                                                <Trash2 className="h-3 w-3 mr-1" />
+                                            )}
+                                            <span className="">{deletingIds.has(item.id) ? 'Deleting...' : 'Delete'}</span>
+                                        </Button>
                                     </div>
-                                )}
-
-                                {/* Actions */}
-                                <div className={`flex gap-1.5 sm:gap-2 ${viewMode === 'list' ? 'ml-auto' : ''}`}>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => handleView(item.url)}
-                                        className="flex-1 cursor-pointer hover:bg-primary/10 hover:border-primary/30 text-xs sm:text-sm px-2 sm:px-3"
-                                    >
-                                        <ExternalLink className="h-3 w-3 mr-1" />
-                                        <span className="">View</span>
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => handleDownload(item.url, item.title || 'download')}
-                                        className="flex-1 cursor-pointer hover:bg-primary/10 hover:border-primary/30 text-xs sm:text-sm px-2 sm:px-3"
-                                    >
-                                        <Download className="h-3 w-3 mr-1" />
-                                        <span className="">Download</span>
-                                    </Button>
                                 </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-
-                {/* No results state */}
-                {!loading && filteredMedia.length === 0 && mediaArray.length > 0 && (
-                    <div className="text-center py-8 sm:py-12 px-4">
-                        <div className="w-12 h-12 sm:w-16 sm:h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-                            <Filter className="h-6 w-6 sm:h-8 sm:w-8 text-muted-foreground" />
+                            ))}
                         </div>
-                        <h3 className="text-base sm:text-lg font-medium mb-2">No files found</h3>
-                        <p className="text-muted-foreground mb-4 text-sm sm:text-base">
-                            Try adjusting your search terms or filters
+                    )}
+
+                    {/* No results state */}
+                    {!loading && filteredMedia.length === 0 && mediaArray.length > 0 && (
+                        <div className="text-center py-8 sm:py-12 px-4">
+                            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+                                <Filter className="h-6 w-6 sm:h-8 sm:w-8 text-muted-foreground" />
+                            </div>
+                            <h3 className="text-base sm:text-lg font-medium mb-2">No files found</h3>
+                            <p className="text-muted-foreground mb-4 text-sm sm:text-base">
+                                Try adjusting your search terms or filters
+                            </p>
+                            <Button variant="outline" onClick={() => {
+                                setSearchTerm('')
+                                setFilterType('all')
+                            }} className="cursor-pointer">
+                                Clear Filters
+                            </Button>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
+            {/* Delete Confirmation Dialog */}
+            {confirmDelete && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center">
+                    {/* Backdrop */}
+                    <div
+                        className="absolute inset-0 bg-background/80 backdrop-blur-sm"
+                        onClick={cancelDelete}
+                    />
+
+                    {/* Dialog */}
+                    <div className="relative bg-card border border-border rounded-lg shadow-lg p-6 w-full max-w-md mx-4">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="p-2 bg-destructive/10 rounded-lg">
+                                <Trash2 className="h-5 w-5 text-destructive" />
+                            </div>
+                            <div>
+                                <h3 className="font-semibold text-foreground">Delete Media File</h3>
+                                <p className="text-sm text-muted-foreground">This action cannot be undone</p>
+                            </div>
+                        </div>
+
+                        <p className="text-sm text-muted-foreground mb-6">
+                            Are you sure you want to delete <strong>&quot;{confirmDelete?.title}&quot;</strong>?
+                            This will permanently remove the file from your media library.
                         </p>
-                        <Button variant="outline" onClick={() => {
-                            setSearchTerm('')
-                            setFilterType('all')
-                        }} className="cursor-pointer">
-                            Clear Filters
-                        </Button>
+
+                        <div className="flex gap-3 justify-end">
+                            <Button
+                                variant="outline"
+                                onClick={cancelDelete}
+                                className="cursor-pointer"
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                variant="destructive"
+                                onClick={confirmDeleteAction}
+                                className="cursor-pointer"
+                            >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                            </Button>
+                        </div>
                     </div>
-                )}
-            </CardContent>
-        </Card>
+                </div>
+            )}
+        </>
     )
 }

@@ -30,9 +30,9 @@ export default function DashboardPage() {
     const [mediaLoading, setMediaLoading] = useState(false)
     const [uploadModalOpen, setUploadModalOpen] = useState(false)
     const [uploadType, setUploadType] = useState<'video' | 'image'>('video')
-    const [isUploadTrackerMinimized, setIsUploadTrackerMinimized] = useState(false)
+    const [isUploadTrackerMinimized, setIsUploadTrackerMinimized] = useState(true)
 
-    const { success, error } = useToast()
+    const { error } = useToast()
     const errorRef = useRef(error)
 
     // Update ref when error function changes
@@ -51,7 +51,11 @@ export default function DashboardPage() {
             if (result && typeof result === 'object' && 'data' in result) {
                 const uploadResult = result as { data: MediaItem, subscription?: SubscriptionData }
                 if (uploadResult.data) {
-                    setMedia(prev => [uploadResult.data, ...prev])
+                    setMedia(prev => {
+                        // Ensure prev is always an array
+                        const currentMedia = Array.isArray(prev) ? prev : []
+                        return [uploadResult.data, ...currentMedia]
+                    })
                 }
                 if (uploadResult.subscription) {
                     setSubscription(uploadResult.subscription)
@@ -63,6 +67,38 @@ export default function DashboardPage() {
         }
     )
 
+    // Debug: log current media state
+    useEffect(() => {
+        console.log('Current media state:', media)
+        console.log('Media length:', media.length)
+    }, [media])
+
+    const loadMediaOnly = useCallback(async () => {
+        setMediaLoading(true)
+        try {
+            const mediaRes = await fetch('/api/media/list').then(res => res.json())
+
+            console.log('Media API Response:', mediaRes)
+
+            if (mediaRes.success) {
+                // The API returns data in a nested structure: { data: { data: [...], count: N } }
+                const mediaData = mediaRes.data?.data || mediaRes.data || []
+                const finalMediaData = Array.isArray(mediaData) ? mediaData : []
+                console.log('Setting media data:', finalMediaData)
+                setMedia(finalMediaData)
+            } else {
+                console.error('Media API error:', mediaRes.error)
+                setMedia([]) // Set empty array on error
+                errorRef.current('Failed to load media', 'Please try refreshing')
+            }
+        } catch (err) {
+            console.error('Media loading error:', err)
+            errorRef.current('Failed to load media', 'Please try refreshing')
+        } finally {
+            setMediaLoading(false)
+        }
+    }, [])
+
     const loadData = useCallback(async () => {
         setLoading(true)
         try {
@@ -71,10 +107,17 @@ export default function DashboardPage() {
                 fetch('/api/subscription/status').then(res => res.json())
             ])
 
+            console.log('Media API Response:', mediaRes)
+
             if (mediaRes.success) {
-                setMedia(mediaRes.data || [])
+                // The API returns data in a nested structure: { data: { data: [...], count: N } }
+                const mediaData = mediaRes.data?.data || mediaRes.data || []
+                const finalMediaData = Array.isArray(mediaData) ? mediaData : []
+                console.log('Setting media data:', finalMediaData)
+                setMedia(finalMediaData)
             } else {
                 console.error('Media API error:', mediaRes.error)
+                setMedia([]) // Set empty array on error
             }
 
             if (subRes.success) {
@@ -108,29 +151,6 @@ export default function DashboardPage() {
     const handleImageUpload = () => {
         setUploadType('image')
         setUploadModalOpen(true)
-    }
-
-    const handleDelete = async (id: string) => {
-        try {
-            const response = await fetch(`/api/media/delete/${id}`, {
-                method: 'DELETE',
-            })
-            const result = await response.json()
-
-            if (result.success) {
-                setMedia(prev => prev.filter(item => item.id !== id))
-                success('Deleted successfully', 'Media file has been deleted.')
-
-                if (result.subscription) {
-                    setSubscription(result.subscription)
-                }
-            } else {
-                error('Delete failed', result.error || 'Failed to delete the media file.')
-            }
-        } catch (err) {
-            console.error('Delete error:', err)
-            error('Delete failed', 'There was an error deleting the file. Please try again.')
-        }
     }
 
     return (
@@ -364,7 +384,7 @@ export default function DashboardPage() {
                             <MediaLibrary
                                 media={media}
                                 loading={mediaLoading}
-                                onDelete={handleDelete}
+                                onRefresh={loadMediaOnly}
                             />
                         </section>
                     </div>
@@ -376,7 +396,12 @@ export default function DashboardPage() {
                 isOpen={uploadModalOpen}
                 onClose={() => setUploadModalOpen(false)}
                 type={uploadType}
-                onUpload={(file: File, title: string, description?: string) => startUpload(file, title, description, uploadType)}
+                onUpload={async (file: File, title: string, description?: string) => {
+                    // Start the upload
+                    await startUpload(file, title, description, uploadType)
+                    // Automatically minimize the upload tracker so user can browse while uploading
+                    setIsUploadTrackerMinimized(true)
+                }}
                 uploading={uploadTasks.some(task => task.status === 'uploading')}
             />
         </div>

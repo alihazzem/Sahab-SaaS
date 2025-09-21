@@ -10,7 +10,6 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { useToast } from "@/components/ui/toast"
 import { TestPaymentControls } from "@/components/ui/test-payment-controls"
-import { LogoutButton } from '@/components/ui/logout-button'
 import {
     Crown,
     Calendar,
@@ -179,18 +178,13 @@ export default function SubscriptionPage() {
             {/* Header Section */}
             <div className="border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
                 <div className="container mx-auto px-4 py-4 sm:py-6">
-                    {/* Top Header with Profile/Logout */}
-                    <div className="flex items-center justify-between mb-4">
+                    {/* Top Header with Breadcrumb */}
+                    <div className="flex items-center justify-start mb-4">
                         {/* Breadcrumb */}
                         <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                             <HandCoins className="h-4 w-4" />
                             <ChevronRight className="h-4 w-4" />
                             <span className="text-foreground font-medium">Subscription</span>
-                        </div>
-
-                        {/* Profile & Logout */}
-                        <div className="flex items-center gap-3">
-                            <LogoutButton />
                         </div>
                     </div>
 
@@ -519,8 +513,8 @@ export default function SubscriptionPage() {
                         </CardContent>
                     </Card>
 
-                    {/* Usage Alerts */}
-                    {subscription && (
+                    {/* Usage Alerts - Only show for Free plan */}
+                    {subscription && subscription.plan.name === 'Free' && (
                         <Card className="border-yellow-200 bg-yellow-50/50">
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2 text-yellow-800">
@@ -542,12 +536,10 @@ export default function SubscriptionPage() {
                                             Transformation usage is at {Math.round(getUsagePercentage(subscription.usage.transformationsUsed, subscription.plan.transformationsLimit))}%. Consider upgrading your plan.
                                         </div>
                                     )}
-                                    {subscription.plan.name === 'Free' && (
-                                        <div className="flex items-center gap-2 text-yellow-800">
-                                            <TrendingUp className="w-4 h-4" />
-                                            Upgrade to Pro for 20x more storage and transformations!
-                                        </div>
-                                    )}
+                                    <div className="flex items-center gap-2 text-yellow-800">
+                                        <TrendingUp className="w-4 h-4" />
+                                        Upgrade to Pro for 20x more storage and transformations!
+                                    </div>
                                 </div>
                             </CardContent>
                         </Card>

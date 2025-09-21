@@ -19,19 +19,16 @@ const navigation = [
         name: 'Dashboard',
         href: '/dashboard',
         icon: LayoutDashboard,
-        description: 'Media library and analytics'
     },
     {
-        name: 'Subscription',
+        name: 'Subscriptions',
         href: '/subscription',
         icon: CreditCard,
-        description: 'Manage your plan and billing'
     },
     {
-        name: 'Admin',
+        name: 'Admin Dashboard',
         href: '/admin',
         icon: Users,
-        description: 'Team management and settings'
     }
 ]
 
@@ -40,7 +37,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ className }: SidebarProps) {
-    const { isOpen, isCollapsed, toggle, close } = useSidebar()
+    const { isOpen, toggle, close, isCollapsed } = useSidebar()
     const pathname = usePathname()
 
     return (
@@ -70,13 +67,18 @@ export function Sidebar({ className }: SidebarProps) {
             )}
 
             {/* Sidebar */}
-            <div className={cn(
-                "fixed inset-y-0 left-0 z-50 bg-card border-r border-border transform transition-all duration-200 ease-in-out lg:translate-x-0 lg:static lg:inset-0",
-                isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
-                isCollapsed ? "lg:w-16" : "lg:w-64",
-                "w-64", // Mobile always full width
-                className
-            )}>
+            <div
+                className={cn(
+                    "fixed inset-y-0 left-0 z-50 bg-card border-r border-border transform transition-all duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0",
+                    // Mobile behavior
+                    isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
+                    // Large screen behavior - use isCollapsed state
+                    isCollapsed ? "lg:w-16" : "lg:w-64",
+                    // Mobile always full width
+                    "w-64",
+                    className
+                )}
+            >
                 <div className="flex flex-col h-full">
                     {/* Header */}
                     <div className={cn(
@@ -87,6 +89,7 @@ export function Sidebar({ className }: SidebarProps) {
                         <div className="flex items-center justify-center transition-all duration-300">
                             <div className={cn(
                                 "rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden transition-all duration-300",
+                                // Use isCollapsed state instead of hover
                                 isCollapsed ? "w-8 h-8" : "w-12 h-12"
                             )}>
                                 <Image
@@ -112,8 +115,7 @@ export function Sidebar({ className }: SidebarProps) {
 
                     {/* Navigation */}
                     <nav className={cn(
-                        "flex-1 py-6 space-y-2",
-                        isCollapsed ? "lg:px-2" : "px-4"
+                        "flex-1 py-6 space-y-2 px-2",
                     )}>
                         {navigation.map((item) => {
                             const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
@@ -123,24 +125,19 @@ export function Sidebar({ className }: SidebarProps) {
                                     href={item.href}
                                     onClick={close}
                                     className={cn(
-                                        "flex items-center space-x-3 px-3 py-3 rounded-lg text-sm font-medium transition-colors",
+                                        "flex items-center space-x-3 px-3 py-3 rounded-lg text-sm font-medium transition-all duration-300",
                                         isActive
                                             ? "bg-primary text-primary-foreground shadow-sm"
                                             : "text-muted-foreground hover:text-foreground hover:bg-accent",
-                                        isCollapsed && "lg:justify-center lg:space-x-0"
+                                        isCollapsed && "lg:justify-center lg:space-x-0",
                                     )}
                                     title={isCollapsed ? item.name : undefined}
                                 >
                                     <item.icon className="h-5 w-5 flex-shrink-0" />
+                                    {/* Show text when not collapsed or on mobile */}
                                     {(!isCollapsed || isOpen) && (
                                         <div className="flex-1 min-w-0">
                                             <div className="truncate">{item.name}</div>
-                                            <div className={cn(
-                                                "text-xs truncate",
-                                                isActive ? "text-primary-foreground/80" : "text-muted-foreground"
-                                            )}>
-                                                {item.description}
-                                            </div>
                                         </div>
                                     )}
                                 </Link>
