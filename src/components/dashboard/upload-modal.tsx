@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -45,30 +45,19 @@ export function UploadModal({
     const [validationWarning, setValidationWarning] = useState<string>('')
     const [loadingQuota, setLoadingQuota] = useState(false)
 
-    // Load user quota information when modal opens
-    useEffect(() => {
-        if (isOpen) {
-            loadQuotaInfo()
-        }
-    }, [isOpen])
+    const validateFile = useCallback((file: File): ClientUsageValidation => {
+        console.log('Validating file with current state:', {
+            fileName: file.name,
+            fileSize: file.size,
+            userPlan: userPlan,
+            loadingQuota: loadingQuota
+        })
 
-    const loadQuotaInfo = async () => {
-        setLoadingQuota(true)
-        try {
-            const [plan, storage] = await Promise.all([
-                fetchUserPlan(),
-                fetchStorageInfo()
-            ])
-            setUserPlan(plan)
-            setStorageInfo(storage)
-        } catch (error) {
-            console.error('Failed to load quota info:', error)
-        } finally {
-            setLoadingQuota(false)
+        // If still loading quota, return valid to avoid false errors
+        if (loadingQuota) {
+            return { isValid: true }
         }
-    }
 
-    const validateFile = (file: File): ClientUsageValidation => {
         // Check file size against plan limits
         const sizeValidation = validateFileSize(file, userPlan)
         if (!sizeValidation.isValid) {
@@ -92,6 +81,48 @@ export function UploadModal({
         }
 
         return { isValid: true }
+    }, [userPlan, loadingQuota, storageInfo])
+
+    // Load user quota information when modal opens
+    useEffect(() => {
+        if (isOpen) {
+            loadQuotaInfo()
+        }
+    }, [isOpen])
+
+    // Re-validate file when plan changes
+    useEffect(() => {
+        if (selectedFile && userPlan !== 'FREE') {
+            console.log('Re-validating file with plan:', userPlan)
+            const validation = validateFile(selectedFile)
+            if (!validation.isValid) {
+                setValidationError(validation.error || '')
+                setValidationWarning('')
+            } else {
+                setValidationError('')
+                setValidationWarning(validation.warning || '')
+            }
+        }
+    }, [userPlan, selectedFile, validateFile])
+
+    const loadQuotaInfo = async () => {
+        setLoadingQuota(true)
+        try {
+            const [plan, storage] = await Promise.all([
+                fetchUserPlan(),
+                fetchStorageInfo()
+            ])
+            console.log('Upload Modal - Loaded quota info:', {
+                plan: plan,
+                storage: storage
+            })
+            setUserPlan(plan)
+            setStorageInfo(storage)
+        } catch (error) {
+            console.error('Failed to load quota info:', error)
+        } finally {
+            setLoadingQuota(false)
+        }
     }
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -102,14 +133,20 @@ export function UploadModal({
             const nameWithoutExt = file.name.split('.').slice(0, -1).join('.')
             setTitle(nameWithoutExt)
 
-            // Validate the selected file
-            const validation = validateFile(file)
-            if (!validation.isValid) {
-                setValidationError(validation.error || '')
-                setValidationWarning('')
-            } else {
-                setValidationError('')
-                setValidationWarning(validation.warning || '')
+            // Clear previous validation messages
+            setValidationError('')
+            setValidationWarning('')
+
+            // Only validate if quota is loaded, otherwise wait for useEffect
+            if (!loadingQuota) {
+                const validation = validateFile(file)
+                if (!validation.isValid) {
+                    setValidationError(validation.error || '')
+                    setValidationWarning('')
+                } else {
+                    setValidationError('')
+                    setValidationWarning(validation.warning || '')
+                }
             }
         } else {
             setValidationError('')
@@ -212,9 +249,6 @@ export function UploadModal({
                                 <Info className="h-4 w-4 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
                                 <div className="text-sm">
                                     <p className="font-medium text-green-800 dark:text-green-200">Processing Available</p>
-                                    <p className="text-green-700 dark:text-green-300">
-                                        Video will be processed in multiple resolutions (1080p, 720p, 480p).
-                                    </p>
                                 </div>
                             </div>
                         )}
@@ -236,32 +270,16 @@ export function UploadModal({
                                 className='cursor-pointer'
                             />
                             {selectedFile && (
-                                <p className="text-sm text-muted-foreground">
-                                    Selected: {selectedFile.name} ({formatFileSize(selectedFile.size)})
-                                </p>
+                                <div className="space-y-1">
+                                    <p className="text-sm text-muted-foreground">
+                                        Selected: {selectedFile.name} ({formatFileSize(selectedFile.size)})
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        Plan: {userPlan} {loadingQuota && '(Loading...)'}
+                                    </p>
+                                </div>
                             )}
                         </div>
-
-                        {/* Quota Information */}
-                        {storageInfo && (
-                            <div className="space-y-2">
-                                <div className="text-sm text-muted-foreground">
-                                    <div className="flex justify-between">
-                                        <span>Storage Usage:</span>
-                                        <span>{formatFileSize(storageInfo.current)} / {formatFileSize(storageInfo.limit)}</span>
-                                    </div>
-                                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mt-1">
-                                        <div
-                                            className="bg-primary h-2 rounded-full transition-all duration-300"
-                                            style={{ width: `${Math.min((storageInfo.current / storageInfo.limit) * 100, 100)}%` }}
-                                        />
-                                    </div>
-                                </div>
-                                <p className="text-xs text-muted-foreground">
-                                    Plan: {userPlan} • Available: {formatFileSize(storageInfo.available)}
-                                </p>
-                            </div>
-                        )}
 
                         {/* Validation Messages */}
                         {validationError && (

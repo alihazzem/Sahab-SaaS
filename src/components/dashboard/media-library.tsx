@@ -254,134 +254,136 @@ export function MediaLibrary({ media, onRefresh, loading = false }: MediaLibrary
 
                 <CardContent className="p-4 sm:p-6">
                     {loading ? (
-                        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                             {Array.from({ length: 6 }).map((_, index) => (
                                 <MediaItemSkeleton key={index} />
                             ))}
                         </div>
                     ) : (
-                        <div className={viewMode === 'grid' ? 'grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' : 'space-y-3'}>
-                            {filteredMedia.map((item) => (
-                                <div
-                                    key={item.id}
-                                    className={`group border border-border rounded-xl p-3 sm:p-4 lg:p-5 hover:bg-accent/30 hover:border-primary/30 hover:shadow-lg transition-all duration-300 ${viewMode === 'list' ? 'flex flex-col gap-3' : ''
-                                        }`}
-                                >
-                                    {/* File header */}
-                                    <div className={`flex items-start justify-between ${viewMode === 'list' ? 'flex-1' : 'mb-3'}`}>
-                                        <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
-                                            <div className={`p-1.5 sm:p-2 rounded-lg flex-shrink-0 ${item.type === 'video' ? 'bg-blue-500/10' : 'bg-green-500/10'}`}>
-                                                {item.type === 'video' ? (
-                                                    <Video className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 text-blue-500" />
-                                                ) : (
-                                                    <ImageIcon className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 text-green-500" />
+                        <>
+                            {filteredMedia.length > 0 ? (
+                                <div className={viewMode === 'grid' ? 'grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4' : 'space-y-3'}>
+                                    {filteredMedia.map((item) => (
+                                        <div
+                                            key={item.id}
+                                            className={`group border border-border rounded-xl p-3 sm:p-4 lg:p-5 hover:bg-accent/30 hover:border-primary/30 hover:shadow-lg transition-all duration-300 ${viewMode === 'list' ? 'flex flex-col gap-3' : ''
+                                                }`}
+                                        >
+                                            {/* File header */}
+                                            <div className={`flex items-start justify-between ${viewMode === 'list' ? 'flex-1' : 'mb-3'}`}>
+                                                <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
+                                                    <div className={`p-1.5 sm:p-2 rounded-lg flex-shrink-0 ${item.type === 'video' ? 'bg-blue-500/10' : 'bg-green-500/10'}`}>
+                                                        {item.type === 'video' ? (
+                                                            <Video className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 text-blue-500" />
+                                                        ) : (
+                                                            <ImageIcon className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 text-green-500" />
+                                                        )}
+                                                    </div>
+                                                    <div className="min-w-0 flex-1">
+                                                        <h4 className="font-semibold truncate text-xs sm:text-sm group-hover:text-primary transition-colors" title={item.title || 'Untitled'}>
+                                                            {item.title || 'Untitled'}
+                                                        </h4>
+                                                        <div className="flex flex-col xs:flex-row xs:items-center gap-1 mt-1">
+                                                            <Badge variant="secondary" className="text-xs self-start">
+                                                                {item.type}
+                                                            </Badge>
+                                                            <span className="text-xs text-muted-foreground">
+                                                                {formatFileSize(item.originalSize)}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                {viewMode === 'grid' && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => handleView(item.url)}
+                                                        className="opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer flex-shrink-0 hidden sm:flex"
+                                                    >
+                                                        <Eye className="h-4 w-4" />
+                                                    </Button>
                                                 )}
                                             </div>
-                                            <div className="min-w-0 flex-1">
-                                                <h4 className="font-semibold truncate text-xs sm:text-sm group-hover:text-primary transition-colors" title={item.title || 'Untitled'}>
-                                                    {item.title || 'Untitled'}
-                                                </h4>
-                                                <div className="flex flex-col xs:flex-row xs:items-center gap-1 mt-1">
-                                                    <Badge variant="secondary" className="text-xs self-start">
-                                                        {item.type}
-                                                    </Badge>
-                                                    <span className="text-xs text-muted-foreground">
-                                                        {formatFileSize(item.originalSize)}
-                                                    </span>
+
+                                            {/* File details */}
+                                            {viewMode === 'grid' && (
+                                                <div className="space-y-1 sm:space-y-2 text-xs text-muted-foreground mb-3 sm:mb-4">
+                                                    {item.type === 'video' && item.duration && (
+                                                        <div className="flex items-center gap-1">
+                                                            <Video className="h-3 w-3 flex-shrink-0" />
+                                                            <span className="truncate">Duration: {item.duration}s</span>
+                                                        </div>
+                                                    )}
+                                                    {item.width && item.height && (
+                                                        <div className="flex items-center gap-1">
+                                                            <ImageIcon className="h-3 w-3 flex-shrink-0" />
+                                                            <span className="truncate">{item.width} × {item.height}</span>
+                                                        </div>
+                                                    )}
+                                                    <div className="flex items-center gap-1">
+                                                        <Calendar className="h-3 w-3 flex-shrink-0" />
+                                                        <span className="truncate">{formatDate(item.createdAt)}</span>
+                                                    </div>
                                                 </div>
+                                            )}
+
+                                            {/* Actions */}
+                                            <div className={`flex flex-wrap gap-1.5 sm:gap-2 ${viewMode === 'list' ? 'ml-auto' : ''}`}>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => handleView(item.url)}
+                                                    className="cursor-pointer hover:bg-primary/10 hover:border-primary/30 text-xs px-2 py-1 h-auto min-w-0 flex-shrink-0"
+                                                >
+                                                    <ExternalLink className="h-3 w-3 mr-1 flex-shrink-0" />
+                                                    <span className="hidden sm:inline">View</span>
+                                                </Button>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => handleDownload(item.url, item.title || 'download')}
+                                                    className="cursor-pointer hover:bg-primary/10 hover:border-primary/30 text-xs px-2 py-1 h-auto min-w-0 flex-shrink-0"
+                                                >
+                                                    <Download className="h-3 w-3 mr-1 flex-shrink-0" />
+                                                    <span className="hidden sm:inline">Download</span>
+                                                </Button>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => initiateDelete(item.id, item.title || 'Untitled')}
+                                                    disabled={deletingIds.has(item.id)}
+                                                    className="cursor-pointer hover:bg-destructive/10 hover:border-destructive/30 hover:text-destructive text-xs px-2 py-1 h-auto min-w-0 flex-shrink-0"
+                                                >
+                                                    {deletingIds.has(item.id) ? (
+                                                        <Loader2 className="h-3 w-3 mr-1 animate-spin flex-shrink-0" />
+                                                    ) : (
+                                                        <Trash2 className="h-3 w-3 mr-1 flex-shrink-0" />
+                                                    )}
+                                                    <span className="hidden sm:inline">{deletingIds.has(item.id) ? 'Deleting...' : 'Delete'}</span>
+                                                </Button>
                                             </div>
                                         </div>
-                                        {viewMode === 'grid' && (
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => handleView(item.url)}
-                                                className="opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer flex-shrink-0 hidden sm:flex"
-                                            >
-                                                <Eye className="h-4 w-4" />
-                                            </Button>
-                                        )}
-                                    </div>
-
-                                    {/* File details */}
-                                    {viewMode === 'grid' && (
-                                        <div className="space-y-1 sm:space-y-2 text-xs text-muted-foreground mb-3 sm:mb-4">
-                                            {item.type === 'video' && item.duration && (
-                                                <div className="flex items-center gap-1">
-                                                    <Video className="h-3 w-3 flex-shrink-0" />
-                                                    <span className="truncate">Duration: {item.duration}s</span>
-                                                </div>
-                                            )}
-                                            {item.width && item.height && (
-                                                <div className="flex items-center gap-1">
-                                                    <ImageIcon className="h-3 w-3 flex-shrink-0" />
-                                                    <span className="truncate">{item.width} × {item.height}</span>
-                                                </div>
-                                            )}
-                                            <div className="flex items-center gap-1">
-                                                <Calendar className="h-3 w-3 flex-shrink-0" />
-                                                <span className="truncate">{formatDate(item.createdAt)}</span>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Actions */}
-                                    <div className={`flex gap-1.5 sm:gap-2 ${viewMode === 'list' ? 'ml-auto' : ''}`}>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => handleView(item.url)}
-                                            className="flex-1 cursor-pointer hover:bg-primary/10 hover:border-primary/30 text-xs sm:text-sm px-2 sm:px-3"
-                                        >
-                                            <ExternalLink className="h-3 w-3 mr-1" />
-                                            <span className="">View</span>
-                                        </Button>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => handleDownload(item.url, item.title || 'download')}
-                                            className="flex-1 cursor-pointer hover:bg-primary/10 hover:border-primary/30 text-xs sm:text-sm px-2 sm:px-3"
-                                        >
-                                            <Download className="h-3 w-3 mr-1" />
-                                            <span className="">Download</span>
-                                        </Button>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => initiateDelete(item.id, item.title || 'Untitled')}
-                                            disabled={deletingIds.has(item.id)}
-                                            className="flex-1 cursor-pointer hover:bg-destructive/10 hover:border-destructive/30 hover:text-destructive text-xs sm:text-sm px-2 sm:px-3"
-                                        >
-                                            {deletingIds.has(item.id) ? (
-                                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                            ) : (
-                                                <Trash2 className="h-3 w-3 mr-1" />
-                                            )}
-                                            <span className="">{deletingIds.has(item.id) ? 'Deleting...' : 'Delete'}</span>
-                                        </Button>
-                                    </div>
+                                    ))}
                                 </div>
-                            ))}
-                        </div>
-                    )}
-
-                    {/* No results state */}
-                    {!loading && filteredMedia.length === 0 && mediaArray.length > 0 && (
-                        <div className="text-center py-8 sm:py-12 px-4">
-                            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-                                <Filter className="h-6 w-6 sm:h-8 sm:w-8 text-muted-foreground" />
-                            </div>
-                            <h3 className="text-base sm:text-lg font-medium mb-2">No files found</h3>
-                            <p className="text-muted-foreground mb-4 text-sm sm:text-base">
-                                Try adjusting your search terms or filters
-                            </p>
-                            <Button variant="outline" onClick={() => {
-                                setSearchTerm('')
-                                setFilterType('all')
-                            }} className="cursor-pointer">
-                                Clear Filters
-                            </Button>
-                        </div>
+                            ) : (
+                                /* Empty state when no files match filters */
+                                <div className="text-center py-8 sm:py-12 px-4">
+                                    <div className="w-12 h-12 sm:w-16 sm:h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+                                        <Filter className="h-6 w-6 sm:h-8 sm:w-8 text-muted-foreground" />
+                                    </div>
+                                    <h3 className="text-base sm:text-lg font-medium mb-2">No files found</h3>
+                                    <p className="text-muted-foreground mb-4 text-sm sm:text-base">
+                                        Try adjusting your search terms or filters
+                                    </p>
+                                    <Button variant="outline" onClick={() => {
+                                        setSearchTerm('')
+                                        setFilterType('all')
+                                    }} className="cursor-pointer">
+                                        Clear Filters
+                                    </Button>
+                                </div>
+                            )}
+                        </>
                     )}
                 </CardContent>
             </Card>

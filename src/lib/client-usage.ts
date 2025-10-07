@@ -20,12 +20,23 @@ export const PLAN_LIMITS: Record<string, { maxFileSize: number; storage: number 
 }
 
 export function validateFileSize(file: File, plan: string): ClientUsageValidation {
-    const limits = PLAN_LIMITS[plan] || PLAN_LIMITS['FREE']
+    const normalizedPlan = plan.toUpperCase()
+    const limits = PLAN_LIMITS[normalizedPlan] || PLAN_LIMITS['FREE']
+
+    console.log('Validating file size:', {
+        fileName: file.name,
+        fileSize: file.size,
+        fileSizeFormatted: formatFileSize(file.size),
+        plan: plan,
+        normalizedPlan: normalizedPlan,
+        maxFileSize: limits.maxFileSize,
+        maxFileSizeFormatted: formatFileSize(limits.maxFileSize)
+    })
 
     if (file.size > limits.maxFileSize) {
         return {
             isValid: false,
-            error: `File size (${formatFileSize(file.size)}) exceeds ${plan} plan limit of ${formatFileSize(limits.maxFileSize)}`
+            error: `File size (${formatFileSize(file.size)}) exceeds ${normalizedPlan} plan limit of ${formatFileSize(limits.maxFileSize)}`
         }
     }
 
@@ -33,7 +44,7 @@ export function validateFileSize(file: File, plan: string): ClientUsageValidatio
     if (file.size > limits.maxFileSize * 0.8) {
         return {
             isValid: true,
-            warning: `File size is close to your ${plan} plan limit`
+            warning: `File size is close to your ${normalizedPlan} plan limit`
         }
     }
 
@@ -67,7 +78,14 @@ export function formatFileSize(bytes: number): string {
     const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB']
     const i = Math.floor(Math.log(bytes) / Math.log(k))
 
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+    const value = bytes / Math.pow(k, i)
+
+    // Handle special case for 1000 MB = 1 GB
+    if (i === 2 && value >= 1000) {
+        return '1 GB'
+    }
+
+    return parseFloat(value.toFixed(2)) + ' ' + sizes[i]
 }
 
 export async function fetchStorageInfo(): Promise<StorageInfo | null> {
@@ -76,7 +94,15 @@ export async function fetchStorageInfo(): Promise<StorageInfo | null> {
         if (!response.ok) return null
 
         const data = await response.json()
-        return data.usage || null
+        if (data.success && data.subscription) {
+            const { plan, usage } = data.subscription
+            return {
+                current: (usage?.storageUsed || 0) * 1024 * 1024, // Convert MB to bytes
+                limit: plan.storageLimit * 1024 * 1024, // Convert MB to bytes
+                available: Math.max(0, (plan.storageLimit - (usage?.storageUsed || 0)) * 1024 * 1024)
+            }
+        }
+        return null
     } catch (error) {
         console.error('Failed to fetch storage info:', error)
         return null
@@ -85,11 +111,24 @@ export async function fetchStorageInfo(): Promise<StorageInfo | null> {
 
 export async function fetchUserPlan(): Promise<string> {
     try {
+        console.log('Fetching user plan from API...')
         const response = await fetch('/api/subscription/status')
-        if (!response.ok) return 'FREE'
+        if (!response.ok) {
+            console.log('API response not OK:', response.status, response.statusText)
+            return 'FREE'
+        }
 
         const data = await response.json()
-        return data.plan || 'FREE'
+        console.log('Full API response:', JSON.stringify(data, null, 2))
+
+        if (data.success && data.subscription?.plan?.name) {
+            const planName = data.subscription.plan.name.toUpperCase()
+            console.log('Extracted plan name:', planName)
+            return planName
+        }
+
+        console.log('No valid plan found in response, defaulting to FREE')
+        return 'FREE'
     } catch (error) {
         console.error('Failed to fetch user plan:', error)
         return 'FREE'

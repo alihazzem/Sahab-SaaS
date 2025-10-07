@@ -14,11 +14,11 @@ import {
     Plus,
     Sparkles,
 } from 'lucide-react'
-import { UsageAnalytics } from '@/components/dashboard/usage-analytics'
 import { MediaLibrary } from '@/components/dashboard/media-library'
 import { UploadModal } from '@/components/dashboard/upload-modal'
 import { UploadProgressTracker } from '@/components/dashboard/upload-progress-tracker'
 import { UploadStatusIndicator } from '@/components/dashboard/upload-status-indicator'
+import AnalyticsDashboard from '@/components/dashboard/analytics-dashboard'
 import { useBackgroundUpload } from '@/hooks/useBackgroundUpload'
 import { useToast } from '@/components/ui/toast'
 import type { MediaItem, SubscriptionData } from '@/types'
@@ -214,7 +214,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Main Content */}
-            <div className="space-y-6">
+            <div className="space-y-4">
                 {loading ? (
                     <div className="flex items-center justify-center py-12 sm:py-16">
                         <div className="text-center max-w-md px-4">
@@ -233,18 +233,18 @@ export default function DashboardPage() {
                         </div>
                     </div>
                 ) : (
-                    <div className="space-y-6 sm:space-y-8">
+                    <div className="space-y-4 sm:space-y-6">
                         {/* Usage Analytics */}
                         {subscription && (
                             <section>
                                 <div className="flex items-center gap-2 mb-6">
                                     <BarChart3 className="h-5 w-5 text-primary" />
-                                    <h2 className="text-lg sm:text-xl font-semibold">Usage & Plan Analytics</h2>
+                                    <h2 className="text-lg sm:text-xl font-semibold">Usage Analytics</h2>
                                     <Badge variant="secondary" className="text-xs">
                                         {subscription.plan.name} Plan
                                     </Badge>
                                 </div>
-                                <UsageAnalytics subscription={subscription} />
+                                <AnalyticsDashboard subscription={subscription} />
                             </section>
                         )}
 

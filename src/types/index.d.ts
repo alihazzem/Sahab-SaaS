@@ -130,3 +130,88 @@ export interface PlanLimits {
     maxFileSize: number // in bytes
     storage: number // in bytes
 }
+
+// Enhanced Usage Analytics Types
+export interface UsageStatus {
+    used: number
+    limit: number
+    remaining: number
+    percentage: number
+    status: 'good' | 'moderate' | 'warning' | 'critical'
+}
+
+export interface HistoricalUsageData {
+    month: number
+    year: number
+    monthName: string
+    storageUsed: number
+    transformationsUsed: number
+    uploadsCount: number
+}
+
+export interface UsageGrowth {
+    storage: number
+    transformations: number
+    uploads: number
+}
+
+export interface FileTypeBreakdown {
+    type: string
+    count: number
+    size: number // in MB
+    percentage: number
+}
+
+export interface DailyActivity {
+    date: string
+    uploads: number
+    storage: number // in MB
+}
+
+export interface UsageAnalytics {
+    historical: HistoricalUsageData[]
+    growth: UsageGrowth
+    fileTypes: FileTypeBreakdown[]
+    dailyActivity: DailyActivity[]
+    summary: {
+        totalMonths: number
+        totalStorageUsed: number
+        totalTransformations: number
+        totalUploads: number
+        averageMonthlyStorage: number
+        planLimits: {
+            storage: number
+            transformations: number
+            planName: string
+        } | null
+    }
+}
+
+export interface CurrentUsage {
+    current: {
+        month: number
+        year: number
+        storage: UsageStatus
+        transformations: UsageStatus
+        uploads: {
+            count: number
+        }
+    }
+    plan: {
+        id: string
+        name: string
+        price: number
+        limits: {
+            storage: number
+            transformations: number
+            maxUploadSize: number
+            teamMembers: number
+        }
+    }
+    subscription: {
+        status: string
+        startDate?: string
+        endDate?: string
+        isActive: boolean
+    }
+}

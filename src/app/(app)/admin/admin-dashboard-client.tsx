@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -54,6 +54,7 @@ export default function AdminDashboardClient({
 }: AdminDashboardClientProps) {
     const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [inviteEmail, setInviteEmail] = useState('');
     const [inviteRole, setInviteRole] = useState<'MEMBER' | 'MANAGER' | 'ADMIN'>('MEMBER');
@@ -61,14 +62,13 @@ export default function AdminDashboardClient({
     const [searchTerm, setSearchTerm] = useState('');
     const [filterRole, setFilterRole] = useState<'ALL' | 'MEMBER' | 'MANAGER' | 'ADMIN'>('ALL');
     const [filterStatus, setFilterStatus] = useState<'ALL' | 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'EXPIRED'>('ALL');
+    const [resendingIds, setResendingIds] = useState<Set<string>>(new Set());
+    const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
+    const [editRole, setEditRole] = useState<'MEMBER' | 'MANAGER' | 'ADMIN'>('MEMBER');
 
     const { success, error: showError } = useToast();
 
-    useEffect(() => {
-        fetchTeamMembers();
-    }, []);
-
-    const fetchTeamMembers = async () => {
+    const fetchTeamMembers = useCallback(async () => {
         try {
             setLoading(true);
             setError(null);
@@ -81,13 +81,34 @@ export default function AdminDashboardClient({
 
             const data = await response.json();
             setTeamMembers(data.teamMembers || []);
+
+            return { success: true };
         } catch (err) {
             setError('Failed to load team members');
             console.error('Team members fetch error:', err);
+            return { success: false, error: err };
         } finally {
             setLoading(false);
         }
+    }, []);
+
+    const handleRefresh = async () => {
+        try {
+            setRefreshing(true);
+            const result = await fetchTeamMembers();
+            if (result.success) {
+                success('Team members refreshed', 'Team member list has been updated.');
+            } else {
+                showError('Refresh failed', 'Failed to refresh team members');
+            }
+        } finally {
+            setRefreshing(false);
+        }
     };
+
+    useEffect(() => {
+        fetchTeamMembers();
+    }, [fetchTeamMembers]);
 
     const handleInviteTeamMember = async () => {
         if (!inviteEmail) return;
@@ -112,7 +133,7 @@ export default function AdminDashboardClient({
 
             setInviteEmail('');
             setInviteRole('MEMBER');
-            fetchTeamMembers();
+            await fetchTeamMembers();
             success('Team member invited successfully', 'An invitation email has been sent.');
         } catch (err) {
             showError('Invitation failed', (err as Error).message || 'Failed to invite team member');
@@ -122,31 +143,115 @@ export default function AdminDashboardClient({
         }
     };
 
-    const handleRemoveTeamMember = async (memberUserId: string) => {
+    const handleRemoveTeamMember = async (member: TeamMember) => {
         try {
-            const response = await fetch('/api/admin/team-members', {
+            // For pending invitations, we need to cancel them using the team member ID
+            // For accepted members, we remove them using their user ID
+            const endpoint = member.status === 'PENDING' ? '/api/admin/team-members/cancel' : '/api/admin/team-members';
+            const body = member.status === 'PENDING'
+                ? { teamMemberId: member.id }
+                : { memberUserId: member.userId };
+
+            const response = await fetch(endpoint, {
                 method: 'DELETE',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ memberUserId }),
+                body: JSON.stringify(body),
             });
 
             if (!response.ok) {
-                throw new Error('Failed to remove team member');
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to remove team member');
             }
 
-            fetchTeamMembers();
-            success('Team member removed', 'The team member has been removed successfully.');
+            await fetchTeamMembers();
+            success('Team member removed',
+                member.status === 'PENDING'
+                    ? 'The invitation has been canceled successfully.'
+                    : 'The team member has been removed successfully.'
+            );
         } catch (err) {
-            showError('Remove failed', 'Failed to remove team member');
+            showError('Remove failed', (err as Error).message || 'Failed to remove team member');
             console.error('Remove error:', err);
         }
     };
 
-    const canAddMoreMembers = (subscription?.teamMembersAllowed || 0) === -1 || teamMembersCount < (subscription?.teamMembersAllowed || 0);
+    const handleResendInvitation = async (teamMemberId: string) => {
+        try {
+            setResendingIds(prev => new Set(prev).add(teamMemberId));
+
+            const response = await fetch('/api/admin/team-members/resend', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ teamMemberId }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to resend invitation');
+            }
+
+            success('Invitation resent', 'The invitation email has been sent again.');
+        } catch (err) {
+            showError('Resend failed', (err as Error).message || 'Failed to resend invitation');
+            console.error('Resend error:', err);
+        } finally {
+            setResendingIds(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(teamMemberId);
+                return newSet;
+            });
+        }
+    };
+
+    const handleEditTeamMember = (member: TeamMember) => {
+        setEditingMember(member);
+        setEditRole(member.role);
+    };
+
+    const handleSaveEdit = async () => {
+        if (!editingMember) return;
+
+        try {
+            const response = await fetch('/api/admin/team-members/edit', {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    teamMemberId: editingMember.id,
+                    role: editRole
+                }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to update team member');
+            }
+
+            setEditingMember(null);
+            await fetchTeamMembers();
+            success('Team member updated', 'The team member role has been updated successfully.');
+        } catch (err) {
+            showError('Update failed', (err as Error).message || 'Failed to update team member');
+            console.error('Edit error:', err);
+        }
+    };
+
+    const handleCancelEdit = () => {
+        setEditingMember(null);
+        setEditRole('MEMBER');
+    };
+
+    // Calculate actual accepted team members count from fetched data
+    const actualTeamMembersCount = teamMembers.filter(member => member.status === 'ACCEPTED').length;
+
+    const canAddMoreMembers = (subscription?.teamMembersAllowed || 0) === -1 || actualTeamMembersCount < (subscription?.teamMembersAllowed || 0);
     const isUnlimitedPlan = (subscription?.teamMembersAllowed || 0) === -1;
-    const remainingSlots = isUnlimitedPlan ? 'Unlimited' : Math.max(0, (subscription?.teamMembersAllowed || 0) - teamMembersCount);
+    const remainingSlots = isUnlimitedPlan ? 'Unlimited' : Math.max(0, (subscription?.teamMembersAllowed || 0) - actualTeamMembersCount);
 
     // Filter team members based on search and filter criteria
     const filteredTeamMembers = teamMembers.filter(member => {
@@ -222,16 +327,22 @@ export default function AdminDashboardClient({
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-                            {teamMembersCount} / {isUnlimitedPlan ? '∞' : subscription?.teamMembersAllowed || 0}
+                            {actualTeamMembersCount} / {isUnlimitedPlan ? '∞' : subscription?.teamMembersAllowed || 0}
                         </div>
                         <p className="text-sm text-muted-foreground">
                             {isUnlimitedPlan ? 'Unlimited team members' : `${remainingSlots} slots available`}
                         </p>
                         <div className="mt-3 pt-3 border-t border-border/50">
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center justify-between mb-2">
                                 <span className="text-xs text-muted-foreground">Active members</span>
                                 <Badge variant="secondary" className="text-xs">
                                     {teamMembers.filter(m => m.status === 'ACCEPTED').length}
+                                </Badge>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs text-muted-foreground">Pending invitations</span>
+                                <Badge variant="outline" className="text-xs">
+                                    {teamMembers.filter(m => m.status === 'PENDING').length}
                                 </Badge>
                             </div>
                         </div>
@@ -341,12 +452,12 @@ export default function AdminDashboardClient({
                         <Button
                             variant="outline"
                             size="sm"
-                            onClick={fetchTeamMembers}
-                            disabled={loading}
+                            onClick={handleRefresh}
+                            disabled={refreshing}
                             className="cursor-pointer"
                         >
-                            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                            Refresh
+                            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                            {refreshing ? 'Refreshing...' : 'Refresh'}
                         </Button>
                     </div>
 
@@ -467,23 +578,43 @@ export default function AdminDashboardClient({
 
                                             <div className="flex items-center gap-2 sm:ml-4">
                                                 {member.status === 'PENDING' && (
-                                                    <Button size="sm" variant="outline" className="cursor-pointer">
-                                                        <Mail className="h-4 w-4 mr-1" />
-                                                        Resend
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        className="cursor-pointer"
+                                                        onClick={() => handleResendInvitation(member.id)}
+                                                        disabled={resendingIds.has(member.id)}
+                                                    >
+                                                        {resendingIds.has(member.id) ? (
+                                                            <>
+                                                                <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
+                                                                Sending...
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Mail className="h-4 w-4 mr-1" />
+                                                                Resend
+                                                            </>
+                                                        )}
                                                     </Button>
                                                 )}
-                                                <Button size="sm" variant="outline" className="cursor-pointer">
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="cursor-pointer"
+                                                    onClick={() => handleEditTeamMember(member)}
+                                                >
                                                     <Edit className="h-4 w-4 mr-1" />
                                                     Edit
                                                 </Button>
                                                 <Button
                                                     size="sm"
                                                     variant="destructive"
-                                                    onClick={() => handleRemoveTeamMember(member.userId)}
+                                                    onClick={() => handleRemoveTeamMember(member)}
                                                     className="cursor-pointer"
                                                 >
                                                     <Trash2 className="h-4 w-4 mr-1" />
-                                                    Remove
+                                                    {member.status === 'PENDING' ? 'Cancel' : 'Remove'}
                                                 </Button>
                                             </div>
                                         </div>
@@ -494,6 +625,52 @@ export default function AdminDashboardClient({
                     )}
                 </CardContent>
             </Card>
+
+            {/* Edit Team Member Modal */}
+            {editingMember && (
+                <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
+                    <Card className="w-full max-w-md mx-4">
+                        <CardHeader>
+                            <CardTitle>Edit Team Member</CardTitle>
+                            <p className="text-sm text-muted-foreground">
+                                Update the role for {editingMember.email}
+                            </p>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-sm font-medium">Role</label>
+                                    <Select
+                                        value={editRole}
+                                        onValueChange={(value) => setEditRole(value as 'MEMBER' | 'MANAGER' | 'ADMIN')}
+                                        options={[
+                                            { value: 'MEMBER', label: 'Member' },
+                                            { value: 'MANAGER', label: 'Manager' },
+                                            { value: 'ADMIN', label: 'Admin' }
+                                        ]}
+                                        placeholder="Select role"
+                                    />
+                                </div>
+                                <div className="flex gap-2 pt-4">
+                                    <Button
+                                        onClick={handleSaveEdit}
+                                        className="flex-1"
+                                    >
+                                        Save Changes
+                                    </Button>
+                                    <Button
+                                        onClick={handleCancelEdit}
+                                        variant="outline"
+                                        className="flex-1"
+                                    >
+                                        Cancel
+                                    </Button>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
 
             {/* Team Permissions Guide */}
             <Card className="border-secondary/20 bg-gradient-to-r from-secondary/5 to-primary/5">

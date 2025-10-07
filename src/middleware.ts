@@ -1,13 +1,11 @@
 import { clerkMiddleware } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
-import { rateLimit, RATE_LIMITS } from '@/lib/rate-limit';
 
 export default clerkMiddleware(async (auth, req) => {
     const { userId } = await auth();
     const currentUrl = new URL(req.url)
 
     const isAuthPage = currentUrl.pathname.startsWith("/auth/")
-    const isApiRoute = currentUrl.pathname.startsWith("/api/")
     const isProtectedAppRoute = currentUrl.pathname.startsWith("/dashboard") ||
         currentUrl.pathname.startsWith("/subscription")
     const isAdminRoute = currentUrl.pathname.startsWith("/admin")
@@ -49,26 +47,6 @@ export default clerkMiddleware(async (auth, req) => {
             { success: false, error: "Authentication required" },
             { status: 401 }
         )
-    }
-
-    // Apply rate limiting based on route type
-    if (isApiRoute) {
-        let rateLimitConfig = RATE_LIMITS.api // Default
-
-        if (currentUrl.pathname.startsWith("/api/auth/")) {
-            rateLimitConfig = RATE_LIMITS.auth
-        } else if (currentUrl.pathname.startsWith("/api/media/upload")) {
-            rateLimitConfig = RATE_LIMITS.upload
-        } else if (currentUrl.pathname.startsWith("/api/payment")) {
-            rateLimitConfig = RATE_LIMITS.payment
-        } else if (currentUrl.pathname.startsWith("/api/plans") || currentUrl.pathname.startsWith("/api/health")) {
-            rateLimitConfig = RATE_LIMITS.public
-        }
-
-        const rateLimitResponse = await rateLimit(req, rateLimitConfig, userId || undefined)
-        if (rateLimitResponse) {
-            return rateLimitResponse
-        }
     }
 
     // Handle authenticated users on auth pages - redirect to dashboard

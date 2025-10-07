@@ -1,7 +1,9 @@
-import { auth } from '@clerk/nextjs/server'
+import { auth, clerkClient } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 import { redirect } from 'next/navigation'
 import prisma from '@/lib/prisma'
+import { generateInvitationToken } from '@/lib/invitation-tokens'
+import { sendInvitationEmail } from '@/lib/email'
 
 // Admin role constants
 export const TEAM_OWNER_ROLE = 'team_owner'
@@ -227,6 +229,39 @@ export async function checkAdminMiddleware(requireAdmin: boolean = true): Promis
 }
 
 /**
+ * Check access for admin dashboard - allows all authenticated users
+ * but distinguishes between admin privileges and regular users
+ */
+export async function checkAdminDashboardAccess(): Promise<AdminCheckResult & { canAccessDashboard: boolean }> {
+    try {
+        const { userId } = await auth()
+
+        if (!userId) {
+            return {
+                isAdmin: false,
+                role: 'unauthenticated',
+                canAccessDashboard: false
+            }
+        }
+
+        // All authenticated users can access the dashboard
+        const baseResult = await checkAdminAccessByUserId(userId)
+
+        return {
+            ...baseResult,
+            canAccessDashboard: true // Allow all authenticated users
+        }
+    } catch (error) {
+        console.error('Error checking admin dashboard access:', error)
+        return {
+            isAdmin: false,
+            role: 'error',
+            canAccessDashboard: false
+        }
+    }
+}
+
+/**
  * API route helper to protect admin endpoints
  * Usage: const adminCheck = await requireAdminAccess(); if (adminCheck) return adminCheck;
  * @returns Promise<NextResponse | null> - Error response if access denied, null if allowed
@@ -282,7 +317,10 @@ export async function inviteTeamMember(
     try {
         // Check if team owner has admin privileges
         const adminCheck = await checkAdminAccess()
+        console.log('Admin check result:', adminCheck)
+
         if (!adminCheck.isAdmin || adminCheck.userId !== teamOwnerId) {
+            console.log('Admin check failed:', { isAdmin: adminCheck.isAdmin, userId: adminCheck.userId, teamOwnerId })
             return { success: false, error: 'Insufficient privileges' }
         }
 
@@ -293,27 +331,104 @@ export async function inviteTeamMember(
                 status: 'ACCEPTED'
             }
         })
+        console.log('Current members count:', currentMembers)
 
-        if (currentMembers >= (adminCheck.subscription?.teamMembersAllowed || 0)) {
+        const teamLimit = adminCheck.subscription?.teamMembersAllowed || 0
+        console.log('Team limit:', teamLimit)
+
+        // Check if team limit is reached (skip check if unlimited: -1)
+        if (teamLimit !== -1 && currentMembers >= teamLimit) {
+            console.log('Team limit reached:', { currentMembers, teamLimit })
             return { success: false, error: 'Team member limit reached for your plan' }
         }
 
+        // Generate invitation token
+        console.log('Generating invitation token...')
+        const invitationToken = generateInvitationToken()
+        const tokenExpiry = new Date()
+        tokenExpiry.setDate(tokenExpiry.getDate() + 7) // 7 days expiry
+        console.log('Token generated:', invitationToken.substring(0, 10) + '...')
+
         // Create team member invitation
+        console.log('Creating team member record...')
         const teamMember = await prisma.teamMember.create({
             data: {
-                userId: '', // Will be filled when user accepts
                 email,
                 teamOwnerId,
                 role,
                 permissions,
-                status: 'PENDING'
+                status: 'PENDING',
+                inviteToken: invitationToken,
+                tokenExpiresAt: tokenExpiry
+                // userId is omitted - will be null by default for pending invitations
             }
         })
+        console.log('Team member created:', teamMember.id)
 
+        // Generate invitation URL
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+        const invitationUrl = `${baseUrl}/invite/${invitationToken}`
+        console.log('Invitation URL:', invitationUrl)
+
+        // Get inviter details from Clerk
+        const { userId } = await auth()
+        let inviterEmail = 'admin@sahab.com' // fallback
+        let inviterName = 'Team Owner' // fallback
+        let organizationName = 'Your Team' // fallback
+
+        if (userId) {
+            try {
+                const clerk = await clerkClient()
+                const user = await clerk.users.getUser(userId)
+
+                // Use user's first name or full name for organization
+                const firstName = user.firstName || 'Team'
+                const lastName = user.lastName || ''
+                organizationName = lastName ? `${firstName} ${lastName}'s Organization` : `${firstName}'s Organization`
+
+                // Enhanced inviter details
+                inviterEmail = user.emailAddresses[0]?.emailAddress || `user-${userId.slice(-8)}@sahab.com`
+                inviterName = user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : 'Team Owner'
+            } catch (error) {
+                console.error('Failed to get inviter details:', error)
+                // Fallback to previous logic
+                inviterEmail = `user-${userId.slice(-8)}@sahab.com`
+                inviterName = 'Team Owner'
+                organizationName = 'Your Team'
+            }
+        }
+
+        // Send invitation email
+        try {
+            console.log('Sending invitation email...')
+            await sendInvitationEmail({
+                to: email,
+                inviterName,
+                inviterEmail,
+                organizationName,
+                role,
+                invitationToken,
+                invitationUrl
+            })
+            console.log('Email sent successfully')
+        } catch (emailError) {
+            console.error('Error sending invitation email:', emailError)
+            // Don't fail the invitation if email fails - log and continue
+            // The invitation is still created and can be resent later
+        }
+
+        console.log('Invitation process completed successfully')
         return { success: true, teamMember }
     } catch (error) {
         console.error('Error inviting team member:', error)
-        return { success: false, error: 'Failed to invite team member' }
+
+        // Provide more specific error message
+        let errorMessage = 'Failed to invite team member'
+        if (error instanceof Error) {
+            errorMessage = error.message
+        }
+
+        return { success: false, error: errorMessage }
     }
 }
 
@@ -332,6 +447,134 @@ export async function removeTeamMember(teamOwnerId: string, memberUserId: string
     } catch (error) {
         console.error('Error removing team member:', error)
         return false
+    }
+}
+
+/**
+ * Resend invitation email
+ */
+export async function resendInvitation(teamOwnerId: string, teamMemberId: string): Promise<{
+    success: boolean;
+    error?: string;
+}> {
+    try {
+        // Check if team owner has admin privileges
+        const adminCheck = await checkAdminAccess()
+        if (!adminCheck.isAdmin || adminCheck.userId !== teamOwnerId) {
+            return { success: false, error: 'Insufficient privileges' }
+        }
+
+        // Find the pending invitation
+        const teamMember = await prisma.teamMember.findFirst({
+            where: {
+                id: teamMemberId,
+                teamOwnerId,
+                status: 'PENDING'
+            }
+        })
+
+        if (!teamMember) {
+            return { success: false, error: 'Invitation not found or already accepted' }
+        }
+
+        // Check if invitation is expired
+        if (teamMember.tokenExpiresAt && teamMember.tokenExpiresAt < new Date()) {
+            // Generate new token and extend expiry
+            const newToken = generateInvitationToken()
+            const newExpiry = new Date()
+            newExpiry.setDate(newExpiry.getDate() + 7)
+
+            await prisma.teamMember.update({
+                where: { id: teamMemberId },
+                data: {
+                    inviteToken: newToken,
+                    tokenExpiresAt: newExpiry
+                }
+            })
+
+            teamMember.inviteToken = newToken
+        }
+
+        // Generate invitation URL
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+        const invitationUrl = `${baseUrl}/invite/${teamMember.inviteToken}`
+
+        // Get inviter details
+        let inviterEmail = 'admin@sahab.com' // fallback
+        let inviterName = 'Team Owner' // fallback
+        let organizationName = 'Your Team' // fallback
+
+        if (teamOwnerId) {
+            try {
+                const clerk = await clerkClient()
+                const user = await clerk.users.getUser(teamOwnerId)
+
+                // Use user's first name or full name for organization
+                const firstName = user.firstName || 'Team'
+                const lastName = user.lastName || ''
+                organizationName = lastName ? `${firstName} ${lastName}'s Team` : `${firstName}'s Team`
+
+                // Enhanced inviter details
+                inviterEmail = user.emailAddresses[0]?.emailAddress || `user-${teamOwnerId.slice(-8)}@sahab.com`
+                inviterName = user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : 'Team Owner'
+            } catch (error) {
+                console.error('Failed to get inviter details:', error)
+                // Fallback to previous logic
+                inviterEmail = `user-${teamOwnerId.slice(-8)}@sahab.com`
+                inviterName = 'Team Owner'
+                organizationName = 'Your Team'
+            }
+        }
+
+        // Send invitation email
+        await sendInvitationEmail({
+            to: teamMember.email,
+            inviterName,
+            inviterEmail,
+            organizationName,
+            role: teamMember.role,
+            invitationToken: teamMember.inviteToken!,
+            invitationUrl
+        })
+
+        return { success: true }
+    } catch (error) {
+        console.error('Error resending invitation:', error)
+        return { success: false, error: 'Failed to resend invitation' }
+    }
+}
+
+/**
+ * Cancel pending invitation
+ */
+export async function cancelInvitation(teamOwnerId: string, teamMemberId: string): Promise<{
+    success: boolean;
+    error?: string;
+}> {
+    try {
+        // Check if team owner has admin privileges
+        const adminCheck = await checkAdminAccess()
+        if (!adminCheck.isAdmin || adminCheck.userId !== teamOwnerId) {
+            return { success: false, error: 'Insufficient privileges' }
+        }
+
+        // Remove the pending invitation
+        const result = await prisma.teamMember.deleteMany({
+            where: {
+                id: teamMemberId,
+                teamOwnerId,
+                status: 'PENDING'
+            }
+        })
+
+        if (result.count === 0) {
+            return { success: false, error: 'Invitation not found or already accepted' }
+        }
+
+        return { success: true }
+    } catch (error) {
+        console.error('Error canceling invitation:', error)
+        return { success: false, error: 'Failed to cancel invitation' }
     }
 }
 

@@ -16,7 +16,7 @@ import { useSidebar } from '@/app/(app)/layout'
 
 const navigation = [
     {
-        name: 'Dashboard',
+        name: 'Main Dashboard',
         href: '/dashboard',
         icon: LayoutDashboard,
     },
@@ -61,7 +61,7 @@ export function Sidebar({ className }: SidebarProps) {
             {/* Mobile backdrop */}
             {isOpen && (
                 <div
-                    className="lg:hidden fixed inset-0 bg-background/80 backdrop-blur-sm z-40"
+                    className="lg:hidden fixed inset-0 nd/80 backdrop-blur-sm z-40"
                     onClick={close}
                 />
             )}
@@ -86,7 +86,7 @@ export function Sidebar({ className }: SidebarProps) {
                         "lg:justify-center", // Center on desktop
                         "justify-between" // Space between on mobile (logo left, button right)
                     )}>
-                        <div className="flex items-center justify-center transition-all duration-300">
+                        <div className="flex items-center justify-cbg-backgrouenter transition-all duration-300">
                             <div className={cn(
                                 "rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden transition-all duration-300",
                                 // Use isCollapsed state instead of hover

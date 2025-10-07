@@ -27,18 +27,32 @@ export async function getUserStorageUsage(userId: string): Promise<number> {
 
 /**
  * Get user's plan limits based on subscription
- * For now, returns Free plan limits as default
- * TODO: Connect with actual subscription data when implemented
  */
-export async function getUserPlanLimits(userId: string): Promise<typeof PLAN_LIMITS.FREE> {
+export async function getUserPlanLimits(userId: string): Promise<typeof PLAN_LIMITS[PlanType]> {
     try {
-        // TODO: Replace with actual subscription lookup
-        // const subscription = await prisma.subscription.findFirst({
-        //   where: { userId },
-        //   include: { plan: true }
-        // })
+        // Get user's current subscription
+        const subscription = await prisma.subscription.findFirst({
+            where: {
+                userId: userId,
+                status: 'ACTIVE'
+            },
+            include: {
+                plan: true
+            },
+            orderBy: {
+                createdAt: 'desc'
+            }
+        })
 
-        // For now, return Free plan limits (userId will be used when subscription system is connected)
+        if (subscription?.plan) {
+            const planName = subscription.plan.name.toUpperCase() as PlanType
+            if (planName in PLAN_LIMITS) {
+                console.log(`User ${userId} has ${planName} plan with limits:`, PLAN_LIMITS[planName])
+                return PLAN_LIMITS[planName]
+            }
+        }
+
+        console.log(`User ${userId} has no active subscription, using FREE plan limits`)
         return PLAN_LIMITS.FREE
     } catch (error) {
         console.error('Failed to get user plan limits:', error)
@@ -130,9 +144,20 @@ export async function getTransformationUsage(userId: string): Promise<{
     try {
         const planLimits = await getUserPlanLimits(userId)
 
-        // TODO: Implement actual transformation tracking
-        // For now, return mock data
-        const used = 0
+        // Get current month usage from database
+        const currentDate = new Date()
+        const currentMonth = currentDate.getMonth() + 1
+        const currentYear = currentDate.getFullYear()
+
+        const usage = await prisma.usageTracking.findFirst({
+            where: {
+                userId: userId,
+                month: currentMonth,
+                year: currentYear
+            }
+        })
+
+        const used = usage?.transformationsUsed || 0
         const limit = planLimits.transformationsLimit
         const remaining = Math.max(0, limit - used)
         const percentage = (used / limit) * 100
@@ -140,6 +165,7 @@ export async function getTransformationUsage(userId: string): Promise<{
         return { used, limit, remaining, percentage }
     } catch (error) {
         console.error('Failed to get transformation usage:', error)
+        // Return safe defaults based on FREE plan in case of error
         return { used: 0, limit: 50, remaining: 50, percentage: 0 }
     }
 }
