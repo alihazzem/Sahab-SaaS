@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { uploadToCloudinary } from "@/lib/uploadToCloudianry";
 import { isValidImageStrict } from "@/lib/validate";
 import prisma from "@/lib/prisma";
+import { notifyUploadSuccess } from "@/lib/notifications";
 
 const MAX_THUMBNAIL_SIZE = 2 * 1024 * 1024; // 2MB for thumbnails/profile pics
 
@@ -67,6 +68,13 @@ export async function POST(req: NextRequest) {
         });
 
         console.log(`✅ Thumbnail saved to database with ID: ${savedMedia.id}`);
+
+        // Send upload success notification
+        try {
+            await notifyUploadSuccess(userId, file.name || "Thumbnail", "image");
+        } catch (notifError) {
+            console.error("Failed to send upload notification:", notifError);
+        }
 
         return NextResponse.json({
             id: savedMedia.id,

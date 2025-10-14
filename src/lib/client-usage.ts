@@ -90,7 +90,12 @@ export function formatFileSize(bytes: number): string {
 
 export async function fetchStorageInfo(): Promise<StorageInfo | null> {
     try {
-        const response = await fetch('/api/subscription/status')
+        const response = await fetch('/api/subscription/status', {
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        })
         if (!response.ok) return null
 
         const data = await response.json()
@@ -112,7 +117,12 @@ export async function fetchStorageInfo(): Promise<StorageInfo | null> {
 export async function fetchUserPlan(): Promise<string> {
     try {
         console.log('Fetching user plan from API...')
-        const response = await fetch('/api/subscription/status')
+        const response = await fetch('/api/subscription/status', {
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        })
         if (!response.ok) {
             console.log('API response not OK:', response.status, response.statusText)
             return 'FREE'

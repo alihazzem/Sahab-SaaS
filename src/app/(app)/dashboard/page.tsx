@@ -76,7 +76,12 @@ export default function DashboardPage() {
     const loadMediaOnly = useCallback(async () => {
         setMediaLoading(true)
         try {
-            const mediaRes = await fetch('/api/media/list').then(res => res.json())
+            const mediaRes = await fetch('/api/media/list', {
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            }).then(res => res.json())
 
             console.log('Media API Response:', mediaRes)
 
@@ -103,8 +108,18 @@ export default function DashboardPage() {
         setLoading(true)
         try {
             const [mediaRes, subRes] = await Promise.all([
-                fetch('/api/media/list').then(res => res.json()),
-                fetch('/api/subscription/status').then(res => res.json())
+                fetch('/api/media/list', {
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                }).then(res => res.json()),
+                fetch('/api/subscription/status', {
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                }).then(res => res.json())
             ])
 
             console.log('Media API Response:', mediaRes)

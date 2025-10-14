@@ -22,6 +22,7 @@ export function useApiClient() {
             const response = await fetch(url, {
                 ...options,
                 headers,
+                credentials: 'include', // Ensure cookies are sent with the request
             })
 
             // Handle authentication errors
@@ -54,6 +55,7 @@ export const createAuthenticatedClient = (token: string) => {
         const response = await fetch(url, {
             ...options,
             headers,
+            credentials: 'include', // Ensure cookies are sent with the request
         })
 
         if (response.status === 401) {

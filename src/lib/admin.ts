@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import prisma from '@/lib/prisma'
 import { generateInvitationToken } from '@/lib/invitation-tokens'
 import { sendInvitationEmail } from '@/lib/email'
+import { notifyTeamInvitation } from '@/lib/notifications'
 
 // Admin role constants
 export const TEAM_OWNER_ROLE = 'team_owner'
@@ -415,6 +416,25 @@ export async function inviteTeamMember(
             console.error('Error sending invitation email:', emailError)
             // Don't fail the invitation if email fails - log and continue
             // The invitation is still created and can be resent later
+        }
+
+        // Send notification to invitee if they have an account
+        try {
+            // Check if invitee already has an account (find by email in Clerk)
+            const clerk = await clerkClient()
+            const users = await clerk.users.getUserList({ emailAddress: [email] })
+
+            if (users.data.length > 0) {
+                const inviteeUserId = users.data[0].id
+                console.log('Sending notification to existing user:', inviteeUserId)
+                await notifyTeamInvitation(inviteeUserId, inviterName, organizationName, invitationToken)
+                console.log('Notification sent successfully')
+            } else {
+                console.log('Invitee does not have an account yet, skipping notification')
+            }
+        } catch (notifError) {
+            console.error('Failed to send invitation notification:', notifError)
+            // Don't fail the invitation if notification fails
         }
 
         console.log('Invitation process completed successfully')

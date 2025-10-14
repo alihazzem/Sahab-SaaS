@@ -151,3 +151,36 @@ enum PaymentStatus {
   FAILED
   REFUNDED
 }
+
+model Notification {
+  id          String           @id @default(cuid())
+  userId      String // Clerk user ID
+  type        NotificationType
+  title       String
+  message     String
+  actionUrl   String? // Optional URL to navigate to when clicked
+  actionLabel String? // Optional label for action button
+  metadata    Json? // Additional data (e.g., team invite details, usage stats)
+  isRead      Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([userId])
+  @@index([userId, isRead])
+}
+
+enum NotificationType {
+  TEAM_INVITATION
+  USAGE_WARNING
+  USAGE_CRITICAL
+  USAGE_EXCEEDED
+  UPLOAD_SUCCESS
+  UPLOAD_FAILED
+  PLAN_UPGRADE_SUGGESTION
+  TEAM_MEMBER_JOINED
+  TEAM_MEMBER_LEFT
+  SUBSCRIPTION_EXPIRING
+  PAYMENT_SUCCESS
+  PAYMENT_FAILED
+  SYSTEM_ANNOUNCEMENT
+}

@@ -1,5 +1,7 @@
 import crypto from 'crypto';
 import prisma from '@/lib/prisma';
+import { notifyTeamMemberJoined } from '@/lib/notifications';
+import { clerkClient } from '@clerk/nextjs/server';
 
 /**
  * Generate a secure invitation token
@@ -180,6 +182,31 @@ export async function acceptInvitation(token: string, userId: string): Promise<{
                 tokenExpiresAt: null
             }
         });
+
+        // Send notification to team owner
+        try {
+            // Get member name from Clerk
+            const clerk = await clerkClient();
+            const user = await clerk.users.getUser(userId);
+            const memberName = user.firstName
+                ? `${user.firstName} ${user.lastName || ''}`.trim()
+                : user.emailAddresses[0]?.emailAddress || 'New member';
+
+            // Get team owner name
+            const owner = await clerk.users.getUser(validation.invitation.teamOwnerId);
+            const teamName = owner.firstName
+                ? `${owner.firstName}'s Team`
+                : 'Your Team';
+
+            await notifyTeamMemberJoined(
+                validation.invitation.teamOwnerId,
+                memberName,
+                teamName
+            );
+        } catch (notifError) {
+            console.error('Failed to send team member joined notification:', notifError);
+            // Don't fail the acceptance if notification fails
+        }
 
         return {
             success: true,

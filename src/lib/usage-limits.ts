@@ -1,5 +1,6 @@
 import prisma from '@/lib/prisma'
 import { PLAN_LIMITS, type PlanType } from '@/lib/plan-limits'
+import { notifyUsageWarning } from '@/lib/notifications'
 
 /**
  * Get user's current storage usage in MB
@@ -82,6 +83,15 @@ export async function checkStorageLimit(
             projected: projectedUsage,
             percentage: (currentUsageMB / planLimits.storageLimit) * 100,
             remaining: Math.max(0, planLimits.storageLimit - currentUsageMB)
+        }
+
+        // Send notifications based on usage percentage (only once when threshold is crossed)
+        if (usage.percentage >= 80) {
+            try {
+                await notifyUsageWarning(userId, 'storage', usage.percentage, usage.current, usage.limit)
+            } catch (error) {
+                console.error('Failed to send usage notification:', error)
+            }
         }
 
         if (projectedUsage > planLimits.storageLimit) {

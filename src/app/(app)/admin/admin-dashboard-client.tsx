@@ -50,7 +50,6 @@ interface AdminDashboardClientProps {
 
 export default function AdminDashboardClient({
     subscription,
-    teamMembersCount
 }: AdminDashboardClientProps) {
     const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
     const [loading, setLoading] = useState(true);
@@ -73,7 +72,12 @@ export default function AdminDashboardClient({
             setLoading(true);
             setError(null);
 
-            const response = await fetch('/api/admin/team-members');
+            const response = await fetch('/api/admin/team-members', {
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
 
             if (!response.ok) {
                 throw new Error('Failed to fetch team members');
@@ -117,6 +121,7 @@ export default function AdminDashboardClient({
             setInviting(true);
             const response = await fetch('/api/admin/team-members', {
                 method: 'POST',
+                credentials: 'include',
                 headers: {
                     'Content-Type': 'application/json',
                 },
@@ -183,6 +188,7 @@ export default function AdminDashboardClient({
 
             const response = await fetch('/api/admin/team-members/resend', {
                 method: 'POST',
+                credentials: 'include',
                 headers: {
                     'Content-Type': 'application/json',
                 },
@@ -218,6 +224,7 @@ export default function AdminDashboardClient({
         try {
             const response = await fetch('/api/admin/team-members/edit', {
                 method: 'PATCH',
+                credentials: 'include',
                 headers: {
                     'Content-Type': 'application/json',
                 },

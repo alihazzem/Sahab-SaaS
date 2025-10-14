@@ -5,6 +5,7 @@ import { Sidebar } from '@/components/dashboard/sidebar'
 import { LogoutButton } from '@/components/ui/logout-button'
 import { Button } from '@/components/ui/button'
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { NotificationBell } from '@/components/dashboard/notification-bell'
 
 // Create context for sidebar state
 interface SidebarContextType {
@@ -97,8 +98,9 @@ function AppLayoutContent({ children }: { children: ReactNode }) {
                                 </Button>
                             </div>
 
-                            {/* Right side - Logout */}
-                            <div className="flex items-center space-x-4">
+                            {/* Right side - Notifications and Logout */}
+                            <div className="flex items-center space-x-2">
+                                <NotificationBell />
                                 <LogoutButton />
                             </div>
                         </div>

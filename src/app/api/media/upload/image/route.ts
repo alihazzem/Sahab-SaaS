@@ -13,6 +13,7 @@ import {
     checkStorageLimit,
     checkFileSizeLimit
 } from "@/lib/usage-limits";
+import { notifyUploadSuccess } from "@/lib/notifications";
 
 
 export async function POST(req: NextRequest) {
@@ -98,6 +99,14 @@ export async function POST(req: NextRequest) {
         });
 
         console.log(`✅ Image saved to database with ID: ${savedMedia.id}`);
+
+        // Send upload success notification
+        try {
+            await notifyUploadSuccess(userId, title.trim(), "image");
+        } catch (notifError) {
+            // Don't fail the upload if notification fails
+            console.error("Failed to send upload notification:", notifError);
+        }
 
         const responseData = {
             id: savedMedia.id,

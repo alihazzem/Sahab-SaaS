@@ -15,6 +15,7 @@ import {
     checkFileSizeLimit,
     checkTransformationLimit
 } from "@/lib/usage-limits";
+import { notifyUploadSuccess } from "@/lib/notifications";
 
 export async function POST(req: NextRequest) {
     try {
@@ -158,6 +159,14 @@ export async function POST(req: NextRequest) {
 
         // Note: Real-time usage sync is handled by the existing direct database update above
         // The new /api/usage/update endpoint can be used by frontend for immediate UI updates
+
+        // Send upload success notification
+        try {
+            await notifyUploadSuccess(userId, title.trim(), "video");
+        } catch (notifError) {
+            // Don't fail the upload if notification fails
+            console.error("Failed to send upload notification:", notifError);
+        }
 
         // Get plan limits for response
         const planLimits = await import('@/lib/plan-limits').then(m => m.PLAN_LIMITS.FREE);

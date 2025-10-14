@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { PaymobClient } from '@/lib/paymob';
 import prisma from '@/lib/prisma';
 import { clerkClient } from '@clerk/nextjs/server';
+import { notifyPaymentSuccess, notifyPaymentFailed } from '@/lib/notifications';
 
 // Create Paymob client instance
 const paymobClientInstance = new PaymobClient();
@@ -86,6 +87,13 @@ export async function POST(request: NextRequest) {
             try {
                 await activateSubscription(payment.userId, payment.planId, payment.plan);
                 console.log('Subscription activated for user:', payment.userId, 'Plan:', payment.plan.name);
+
+                // Send payment success notification
+                try {
+                    await notifyPaymentSuccess(payment.userId, payment.plan.name, processedData.amountEGP);
+                } catch (notifError) {
+                    console.error('Failed to send payment success notification:', notifError);
+                }
             } catch (subscriptionError) {
                 console.error('Failed to activate subscription:', subscriptionError);
 
@@ -110,6 +118,17 @@ export async function POST(request: NextRequest) {
             }
         } else {
             console.log('Payment failed for user:', payment.userId, 'Order:', processedData.orderId);
+
+            // Send payment failed notification
+            try {
+                await notifyPaymentFailed(
+                    payment.userId,
+                    payment.plan.name,
+                    'Payment processing failed'
+                );
+            } catch (notifError) {
+                console.error('Failed to send payment failed notification:', notifError);
+            }
 
             // TODO: Send failure notification email
             // TODO: Log for admin dashboard
