@@ -19,11 +19,15 @@ import {
     Calendar,
     Sparkles,
     FolderOpen,
-    Trash2
+    Trash2,
+    Share2,
+    CheckSquare,
+    Square
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { MediaItemSkeleton } from '@/components/ui/loading'
 import { useToast } from '@/components/ui/toast'
+import { ShareDialog } from './share-dialog'
 import type { MediaLibraryProps } from '@/types'
 
 export function MediaLibrary({ media, onRefresh, loading = false }: MediaLibraryProps & { loading?: boolean }) {
@@ -32,6 +36,16 @@ export function MediaLibrary({ media, onRefresh, loading = false }: MediaLibrary
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
     const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
     const [confirmDelete, setConfirmDelete] = useState<{ id: string; title: string } | null>(null)
+
+    // Batch operations & sharing state
+    const [selectionMode, setSelectionMode] = useState(false)
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+    const [batchDeleting, setBatchDeleting] = useState(false)
+    const [batchDownloading, setBatchDownloading] = useState(false)
+    const [shareDialogOpen, setShareDialogOpen] = useState(false)
+    const [shareMediaId, setShareMediaId] = useState<string | null>(null)
+    const [shareMediaTitle, setShareMediaTitle] = useState<string>('')
+    const [shareMediaType, setShareMediaType] = useState<'video' | 'image'>('video')
 
     const { success, error: showError } = useToast()
 
@@ -115,6 +129,105 @@ export function MediaLibrary({ media, onRefresh, loading = false }: MediaLibrary
         }
     }
 
+    // Batch operations handlers
+    const toggleSelection = (id: string) => {
+        setSelectedIds(prev => {
+            const newSet = new Set(prev)
+            if (newSet.has(id)) {
+                newSet.delete(id)
+            } else {
+                newSet.add(id)
+            }
+            return newSet
+        })
+    }
+
+    const selectAll = () => {
+        setSelectedIds(new Set(filteredMedia.map(m => m.id)))
+    }
+
+    const clearSelection = () => {
+        setSelectedIds(new Set())
+        setSelectionMode(false)
+    }
+
+    const handleBatchDelete = async () => {
+        if (selectedIds.size === 0) return
+
+        setBatchDeleting(true)
+        try {
+            const response = await fetch('/api/media/batch-delete', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids: Array.from(selectedIds) })
+            })
+
+            const data = await response.json()
+
+            if (data.success) {
+                success('Batch delete complete', `${data.data.deleted} items deleted successfully`)
+                clearSelection()
+                onRefresh?.()
+            } else {
+                throw new Error(data.error || 'Failed to delete items')
+            }
+        } catch (error) {
+            showError('Batch delete failed', error instanceof Error ? error.message : 'Unknown error')
+        } finally {
+            setBatchDeleting(false)
+        }
+    }
+
+    const handleBatchDownload = async () => {
+        if (selectedIds.size === 0) return
+
+        setBatchDownloading(true)
+        try {
+            const response = await fetch('/api/media/batch-download', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids: Array.from(selectedIds) })
+            })
+
+            const data = await response.json()
+
+            if (data.success) {
+                // Download each item with staggered delays to avoid browser blocking
+                data.data.items.forEach((item: { url: string; title: string; type: string }, index: number) => {
+                    setTimeout(() => {
+                        const link = document.createElement('a')
+                        link.href = item.url
+                        // Add file extension if not present
+                        const extension = item.type === 'video' ? '.mp4' : '.jpg'
+                        const filename = item.title.includes('.') ? item.title : `${item.title}${extension}`
+                        link.download = filename
+                        link.target = '_blank'
+                        document.body.appendChild(link)
+                        link.click()
+                        document.body.removeChild(link)
+                    }, index * 500) // Stagger downloads by 500ms to avoid browser blocking
+                })
+                success('Downloads started', `Downloading ${data.data.count} items. Please allow multiple downloads in your browser if prompted.`)
+            } else {
+                throw new Error(data.error || 'Failed to prepare downloads')
+            }
+        } catch (error) {
+            showError('Batch download failed', error instanceof Error ? error.message : 'Unknown error')
+        } finally {
+            setBatchDownloading(false)
+        }
+    }
+
+    // Share handler
+    const handleShare = (id: string, title: string, type: 'video' | 'image') => {
+        setShareMediaId(id)
+        setShareMediaTitle(title)
+        setShareMediaType(type)
+        setShareDialogOpen(true)
+    }
+
     if (mediaArray.length === 0 && !loading) {
         return (
             <Card className="border-dashed border-2 border-border hover:border-primary/50 transition-colors">
@@ -188,6 +301,34 @@ export function MediaLibrary({ media, onRefresh, loading = false }: MediaLibrary
                                 </Button>
                             </div>
 
+                            {/* Selection Mode Toggle */}
+                            {!loading && mediaArray.length > 0 && (
+                                <Button
+                                    variant={selectionMode ? 'default' : 'outline'}
+                                    size="sm"
+                                    onClick={() => {
+                                        if (selectionMode) {
+                                            clearSelection()
+                                        } else {
+                                            setSelectionMode(true)
+                                        }
+                                    }}
+                                    className="cursor-pointer"
+                                >
+                                    {selectionMode ? (
+                                        <>
+                                            <CheckSquare className="h-4 w-4 mr-2" />
+                                            Cancel
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Square className="h-4 w-4 mr-2" />
+                                            <span className="hidden sm:inline">Select</span>
+                                        </>
+                                    )}
+                                </Button>
+                            )}
+
                             {/* Refresh Button */}
                             <Button
                                 variant="outline"
@@ -252,6 +393,64 @@ export function MediaLibrary({ media, onRefresh, loading = false }: MediaLibrary
                     )}
                 </CardHeader>
 
+                {/* Batch Action Bar */}
+                {selectedIds.size > 0 && (
+                    <div className="bg-primary text-primary-foreground px-4 sm:px-6 py-3 border-b">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                            <div className="flex items-center gap-3 flex-wrap">
+                                <span className="font-medium">{selectedIds.size} selected</span>
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={selectAll}
+                                    className="cursor-pointer"
+                                    disabled={selectedIds.size === filteredMedia.length}
+                                >
+                                    Select All ({filteredMedia.length})
+                                </Button>
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={clearSelection}
+                                    className="cursor-pointer"
+                                >
+                                    Clear
+                                </Button>
+                            </div>
+                            <div className="flex gap-2">
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={handleBatchDownload}
+                                    disabled={batchDownloading}
+                                    className="cursor-pointer"
+                                >
+                                    {batchDownloading ? (
+                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    ) : (
+                                        <Download className="h-4 w-4 mr-2" />
+                                    )}
+                                    Download
+                                </Button>
+                                <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={handleBatchDelete}
+                                    disabled={batchDeleting}
+                                    className="cursor-pointer"
+                                >
+                                    {batchDeleting ? (
+                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    ) : (
+                                        <Trash2 className="h-4 w-4 mr-2" />
+                                    )}
+                                    Delete
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 <CardContent className="p-4 sm:p-6">
                     {loading ? (
                         <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
@@ -266,9 +465,21 @@ export function MediaLibrary({ media, onRefresh, loading = false }: MediaLibrary
                                     {filteredMedia.map((item) => (
                                         <div
                                             key={item.id}
-                                            className={`group border border-border rounded-xl p-3 sm:p-4 lg:p-5 hover:bg-accent/30 hover:border-primary/30 hover:shadow-lg transition-all duration-300 ${viewMode === 'list' ? 'flex flex-col gap-3' : ''
-                                                }`}
+                                            className={`group relative border border-border rounded-xl p-3 sm:p-4 lg:p-5 hover:bg-accent/30 hover:border-primary/30 hover:shadow-lg transition-all duration-300 ${viewMode === 'list' ? 'flex flex-col gap-3' : ''
+                                                } ${selectedIds.has(item.id) ? 'ring-2 ring-primary bg-accent/50' : ''}`}
                                         >
+                                            {/* Selection Checkbox */}
+                                            {selectionMode && (
+                                                <div className="absolute top-2 left-2 z-10">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedIds.has(item.id)}
+                                                        onChange={() => toggleSelection(item.id)}
+                                                        className="w-5 h-5 cursor-pointer accent-primary"
+                                                    />
+                                                </div>
+                                            )}
+
                                             {/* File header */}
                                             <div className={`flex items-start justify-between ${viewMode === 'list' ? 'flex-1' : 'mb-3'}`}>
                                                 <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
@@ -328,40 +539,51 @@ export function MediaLibrary({ media, onRefresh, loading = false }: MediaLibrary
                                             )}
 
                                             {/* Actions */}
-                                            <div className={`flex flex-wrap gap-1.5 sm:gap-2 ${viewMode === 'list' ? 'ml-auto' : ''}`}>
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => handleView(item.url)}
-                                                    className="cursor-pointer hover:bg-primary/10 hover:border-primary/30 text-xs px-2 py-1 h-auto min-w-0 flex-shrink-0"
-                                                >
-                                                    <ExternalLink className="h-3 w-3 mr-1 flex-shrink-0" />
-                                                    <span className="hidden sm:inline">View</span>
-                                                </Button>
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => handleDownload(item.url, item.title || 'download')}
-                                                    className="cursor-pointer hover:bg-primary/10 hover:border-primary/30 text-xs px-2 py-1 h-auto min-w-0 flex-shrink-0"
-                                                >
-                                                    <Download className="h-3 w-3 mr-1 flex-shrink-0" />
-                                                    <span className="hidden sm:inline">Download</span>
-                                                </Button>
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => initiateDelete(item.id, item.title || 'Untitled')}
-                                                    disabled={deletingIds.has(item.id)}
-                                                    className="cursor-pointer hover:bg-destructive/10 hover:border-destructive/30 hover:text-destructive text-xs px-2 py-1 h-auto min-w-0 flex-shrink-0"
-                                                >
-                                                    {deletingIds.has(item.id) ? (
-                                                        <Loader2 className="h-3 w-3 mr-1 animate-spin flex-shrink-0" />
-                                                    ) : (
-                                                        <Trash2 className="h-3 w-3 mr-1 flex-shrink-0" />
-                                                    )}
-                                                    <span className="hidden sm:inline">{deletingIds.has(item.id) ? 'Deleting...' : 'Delete'}</span>
-                                                </Button>
-                                            </div>
+                                            {!selectionMode && (
+                                                <div className={`flex flex-wrap gap-1.5 sm:gap-2 ${viewMode === 'list' ? 'ml-auto' : ''}`}>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => handleView(item.url)}
+                                                        className="cursor-pointer hover:bg-primary/10 hover:border-primary/30 text-xs px-2 py-1 h-auto min-w-0 flex-shrink-0"
+                                                    >
+                                                        <ExternalLink className="h-3 w-3 mr-1 flex-shrink-0" />
+                                                        <span className="hidden sm:inline">View</span>
+                                                    </Button>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => handleDownload(item.url, item.title || 'download')}
+                                                        className="cursor-pointer hover:bg-primary/10 hover:border-primary/30 text-xs px-2 py-1 h-auto min-w-0 flex-shrink-0"
+                                                    >
+                                                        <Download className="h-3 w-3 mr-1 flex-shrink-0" />
+                                                        <span className="hidden sm:inline">Download</span>
+                                                    </Button>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => handleShare(item.id, item.title || 'Untitled', item.type as 'video' | 'image')}
+                                                        className="cursor-pointer hover:bg-primary/10 hover:border-primary/30 text-xs px-2 py-1 h-auto min-w-0 flex-shrink-0"
+                                                    >
+                                                        <Share2 className="h-3 w-3 mr-1 flex-shrink-0" />
+                                                        <span className="hidden sm:inline">Share</span>
+                                                    </Button>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => initiateDelete(item.id, item.title || 'Untitled')}
+                                                        disabled={deletingIds.has(item.id)}
+                                                        className="cursor-pointer hover:bg-destructive/10 hover:border-destructive/30 hover:text-destructive text-xs px-2 py-1 h-auto min-w-0 flex-shrink-0"
+                                                    >
+                                                        {deletingIds.has(item.id) ? (
+                                                            <Loader2 className="h-3 w-3 mr-1 animate-spin flex-shrink-0" />
+                                                        ) : (
+                                                            <Trash2 className="h-3 w-3 mr-1 flex-shrink-0" />
+                                                        )}
+                                                        <span className="hidden sm:inline">{deletingIds.has(item.id) ? 'Deleting...' : 'Delete'}</span>
+                                                    </Button>
+                                                </div>
+                                            )}
                                         </div>
                                     ))}
                                 </div>
@@ -433,6 +655,20 @@ export function MediaLibrary({ media, onRefresh, loading = false }: MediaLibrary
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Share Dialog */}
+            {shareDialogOpen && shareMediaId && (
+                <ShareDialog
+                    mediaId={shareMediaId}
+                    mediaTitle={shareMediaTitle}
+                    mediaType={shareMediaType}
+                    onClose={() => {
+                        setShareDialogOpen(false)
+                        setShareMediaId(null)
+                        setShareMediaTitle('')
+                    }}
+                />
             )}
         </>
     )

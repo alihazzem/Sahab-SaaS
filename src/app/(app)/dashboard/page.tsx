@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { MediaLibrary } from '@/components/dashboard/media-library'
 import { UploadModal } from '@/components/dashboard/upload-modal'
+import { BulkUploadModal } from '@/components/dashboard/bulk-upload-modal'
 import { UploadProgressTracker } from '@/components/dashboard/upload-progress-tracker'
 import { UploadStatusIndicator } from '@/components/dashboard/upload-status-indicator'
 import AnalyticsDashboard from '@/components/dashboard/analytics-dashboard'
@@ -29,6 +30,7 @@ export default function DashboardPage() {
     const [loading, setLoading] = useState(true)
     const [mediaLoading, setMediaLoading] = useState(false)
     const [uploadModalOpen, setUploadModalOpen] = useState(false)
+    const [bulkUploadModalOpen, setBulkUploadModalOpen] = useState(false)
     const [uploadType, setUploadType] = useState<'video' | 'image'>('video')
     const [isUploadTrackerMinimized, setIsUploadTrackerMinimized] = useState(true)
 
@@ -168,6 +170,16 @@ export default function DashboardPage() {
         setUploadModalOpen(true)
     }
 
+    const handleBulkVideoUpload = () => {
+        setUploadType('video')
+        setBulkUploadModalOpen(true)
+    }
+
+    const handleBulkImageUpload = () => {
+        setUploadType('image')
+        setBulkUploadModalOpen(true)
+    }
+
     return (
         <div className="p-4 lg:p-6 space-y-6">
             {/* Main Header */}
@@ -206,25 +218,89 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
-                    <UploadStatusIndicator
-                        activeUploads={uploadTasks.filter(task => task.status === 'uploading').length}
-                    />
-                    <Button
-                        onClick={handleVideoUpload}
-                        className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer w-full sm:w-auto"
-                    >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Upload Video
-                    </Button>
-                    <Button
-                        onClick={handleImageUpload}
-                        variant="outline"
-                        className="border-border hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer w-full sm:w-auto"
-                    >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Upload Image
-                    </Button>
+                <div className="flex flex-col gap-3 w-full lg:w-auto">
+                    <div className="flex items-center gap-2">
+                        <UploadStatusIndicator
+                            activeUploads={uploadTasks.filter(task => task.status === 'uploading').length}
+                        />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full lg:w-auto lg:min-w-[400px]">
+                        {/* Single Upload - Videos */}
+                        <Button
+                            onClick={handleVideoUpload}
+                            variant="outline"
+                            className="h-auto py-3 px-4 flex flex-col items-start gap-2 hover:bg-primary/5 hover:border-primary transition-all cursor-pointer group"
+                        >
+                            <div className="flex items-center gap-2 w-full">
+                                <div className="p-2 bg-blue-500/10 rounded-lg group-hover:bg-blue-500/20 transition-colors">
+                                    <Video className="h-5 w-5 text-blue-500" />
+                                </div>
+                                <div className="flex-1 text-left">
+                                    <div className="font-semibold text-sm">Single Video</div>
+                                    <div className="text-xs text-muted-foreground">Upload one file</div>
+                                </div>
+                                <Plus className="h-4 w-4 opacity-50 group-hover:opacity-100" />
+                            </div>
+                        </Button>
+
+                        {/* Bulk Upload - Videos */}
+                        <Button
+                            onClick={handleBulkVideoUpload}
+                            className="h-auto py-3 px-4 flex flex-col items-start gap-2 bg-gradient-to-br from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg hover:shadow-xl transition-all cursor-pointer group relative overflow-hidden"
+                        >
+                            <div className="absolute top-0 right-0 px-2 py-0.5 bg-yellow-400 text-yellow-900 text-[10px] font-bold rounded-bl-lg">
+                                BULK
+                            </div>
+                            <div className="flex items-center gap-2 w-full">
+                                <div className="p-2 bg-white/20 rounded-lg group-hover:bg-white/30 transition-colors">
+                                    <Upload className="h-5 w-5 text-white" />
+                                </div>
+                                <div className="flex-1 text-left">
+                                    <div className="font-semibold text-sm text-white">Multiple Videos</div>
+                                    <div className="text-xs text-white/80">Upload many at once</div>
+                                </div>
+                                <Sparkles className="h-4 w-4 text-yellow-300" />
+                            </div>
+                        </Button>
+
+                        {/* Single Upload - Images */}
+                        <Button
+                            onClick={handleImageUpload}
+                            variant="outline"
+                            className="h-auto py-3 px-4 flex flex-col items-start gap-2 hover:bg-green-500/5 hover:border-green-500 transition-all cursor-pointer group"
+                        >
+                            <div className="flex items-center gap-2 w-full">
+                                <div className="p-2 bg-green-500/10 rounded-lg group-hover:bg-green-500/20 transition-colors">
+                                    <ImageIcon className="h-5 w-5 text-green-500" />
+                                </div>
+                                <div className="flex-1 text-left">
+                                    <div className="font-semibold text-sm">Single Image</div>
+                                    <div className="text-xs text-muted-foreground">Upload one file</div>
+                                </div>
+                                <Plus className="h-4 w-4 opacity-50 group-hover:opacity-100" />
+                            </div>
+                        </Button>
+
+                        {/* Bulk Upload - Images */}
+                        <Button
+                            onClick={handleBulkImageUpload}
+                            className="h-auto py-3 px-4 flex flex-col items-start gap-2 bg-gradient-to-br from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 shadow-lg hover:shadow-xl transition-all cursor-pointer group relative overflow-hidden"
+                        >
+                            <div className="absolute top-0 right-0 px-2 py-0.5 bg-yellow-400 text-yellow-900 text-[10px] font-bold rounded-bl-lg">
+                                BULK
+                            </div>
+                            <div className="flex items-center gap-2 w-full">
+                                <div className="p-2 bg-white/20 rounded-lg group-hover:bg-white/30 transition-colors">
+                                    <Upload className="h-5 w-5 text-white" />
+                                </div>
+                                <div className="flex-1 text-left">
+                                    <div className="font-semibold text-sm text-white">Multiple Images</div>
+                                    <div className="text-xs text-white/80">Upload many at once</div>
+                                </div>
+                                <Sparkles className="h-4 w-4 text-yellow-300" />
+                            </div>
+                        </Button>
+                    </div>
                 </div>
             </div>
 
@@ -418,6 +494,18 @@ export default function DashboardPage() {
                     setIsUploadTrackerMinimized(true)
                 }}
                 uploading={uploadTasks.some(task => task.status === 'uploading')}
+            />
+
+            {/* Bulk Upload Modal */}
+            <BulkUploadModal
+                isOpen={bulkUploadModalOpen}
+                onClose={() => setBulkUploadModalOpen(false)}
+                type={uploadType}
+                onUpload={async (file: File, title: string, description?: string) => {
+                    // Start the upload
+                    await startUpload(file, title, description, uploadType)
+                }}
+                transformationsRemaining={subscription?.usage.transformationsRemaining}
             />
         </div>
     )

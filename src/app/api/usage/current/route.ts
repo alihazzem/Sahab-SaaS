@@ -18,7 +18,7 @@ export async function GET() {
         const currentMonth = currentDate.getMonth() + 1
         const currentYear = currentDate.getFullYear()
 
-        const [usage, subscription] = await Promise.all([
+        const [usageResult, subscription] = await Promise.all([
             prisma.usageTracking.findFirst({
                 where: {
                     userId,
@@ -40,6 +40,21 @@ export async function GET() {
             })
         ])
 
+        // If no usage record exists, create one
+        let usage = usageResult
+        if (!usage) {
+            usage = await prisma.usageTracking.create({
+                data: {
+                    userId: userId,
+                    month: currentMonth,
+                    year: currentYear,
+                    storageUsed: 0,
+                    transformationsUsed: 0,
+                    uploadsCount: 0
+                }
+            })
+        }
+
         // Default to Free plan if no subscription
         const currentPlan = subscription?.plan || await prisma.plan.findFirst({
             where: { name: 'Free' }
@@ -53,9 +68,9 @@ export async function GET() {
         }
 
         // Calculate usage stats
-        const storageUsed = usage?.storageUsed || 0
-        const transformationsUsed = usage?.transformationsUsed || 0
-        const uploadsCount = usage?.uploadsCount || 0
+        const storageUsed = usage.storageUsed
+        const transformationsUsed = usage.transformationsUsed
+        const uploadsCount = usage.uploadsCount
 
         const storageRemaining = Math.max(0, currentPlan.storageLimit - storageUsed)
         const transformationsRemaining = Math.max(0, currentPlan.transformationsLimit - transformationsUsed)

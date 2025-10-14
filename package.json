@@ -30,6 +30,7 @@
     "crypto-js": "^4.2.0",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.542.0",
+    "nanoid": "^5.1.6",
     "next": "15.5.2",
     "react": "19.1.0",
     "react-dom": "19.1.0",
