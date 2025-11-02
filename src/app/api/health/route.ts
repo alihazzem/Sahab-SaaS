@@ -50,15 +50,33 @@ async function checkDatabase(): Promise<ServiceStatus> {
 async function checkCloudinary(): Promise<ServiceStatus> {
     const start = Date.now()
     try {
-        // Simple ping to Cloudinary API
-        const response = await fetch('https://api.cloudinary.com/v1_1/demo/image/list', {
-            method: 'GET',
-            signal: AbortSignal.timeout(5000) // 5 second timeout
-        })
+        // Check if Cloudinary environment variables are set
+        const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
+        const apiKey = process.env.CLOUDINARY_API_KEY
+        const apiSecret = process.env.CLOUDINARY_API_SECRET
+
+        if (!cloudName || !apiKey || !apiSecret) {
+            return {
+                status: 'down',
+                error: 'Cloudinary credentials not configured',
+                lastChecked: new Date().toISOString()
+            }
+        }
+
+        // Test Cloudinary by checking if a sample image URL is accessible
+        const response = await fetch(
+            `https://res.cloudinary.com/${cloudName}/image/upload/sample.jpg`,
+            {
+                method: 'HEAD',
+                signal: AbortSignal.timeout(5000) // 5 second timeout
+            }
+        )
 
         const responseTime = Date.now() - start
 
-        if (response.ok) {
+        // 200 or 404 both mean Cloudinary is accessible
+        // 404 just means the sample image doesn't exist, which is fine
+        if (response.ok || response.status === 404) {
             return {
                 status: responseTime < 2000 ? 'up' : 'slow',
                 responseTime,
