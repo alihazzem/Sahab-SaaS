@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import prisma from '@/lib/prisma'
 
+export const dynamic = 'force-dynamic';
+
 // PATCH /api/notifications/[id] - Mark notification as read
 export async function PATCH(
     request: Request,
