@@ -72,7 +72,7 @@ export function ShareDialog({ mediaId, mediaTitle, mediaType, onClose }: ShareDi
                 setCopied(true)
                 success('Copied!', 'Share link copied to clipboard')
                 setTimeout(() => setCopied(false), 2000)
-            } catch (error) {
+            } catch {
                 showError('Failed to copy', 'Please copy manually')
             }
         }

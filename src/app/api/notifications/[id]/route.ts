@@ -5,7 +5,7 @@ import prisma from '@/lib/prisma'
 // PATCH /api/notifications/[id] - Mark notification as read
 export async function PATCH(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const { userId } = await auth()
@@ -17,7 +17,7 @@ export async function PATCH(
             )
         }
 
-        const notificationId = params.id
+        const { id: notificationId } = await params
 
         // Verify notification belongs to user
         const notification = await prisma.notification.findUnique({
@@ -55,7 +55,7 @@ export async function PATCH(
 // DELETE /api/notifications/[id] - Delete notification
 export async function DELETE(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const { userId } = await auth()
@@ -67,7 +67,7 @@ export async function DELETE(
             )
         }
 
-        const notificationId = params.id
+        const { id: notificationId } = await params
 
         // Verify notification belongs to user
         const notification = await prisma.notification.findUnique({
