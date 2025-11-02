@@ -21,11 +21,8 @@ A modern, full-stack SaaS platform for media management with advanced features i
 - [Environment Variables](#-environment-variables)
 - [Database Schema](#-database-schema)
 - [API Documentation](#-api-documentation)
-- [Deployment](#-deployment)
 - [Project Structure](#-project-structure)
-- [Screenshots](#-screenshots)
 - [Contributing](#-contributing)
-- [License](#-license)
 
 ---
 
@@ -425,47 +422,6 @@ const data = await response.json();
 
 ---
 
-## 🚀 Deployment
-
-### Recommended: Vercel
-
-1. **Connect your repository to Vercel**
-   ```bash
-   npm i -g vercel
-   vercel
-   ```
-
-2. **Set environment variables in Vercel Dashboard**
-   - Go to Project Settings → Environment Variables
-   - Add all variables from `.env.local`
-
-3. **Deploy**
-   ```bash
-   vercel --prod
-   ```
-
-### Alternative Platforms
-
-- **Railway**: [Deploy Guide](https://railway.app/new)
-- **Render**: [Deploy Guide](https://render.com/docs)
-- **Netlify**: [Deploy Guide](https://www.netlify.com/blog/2020/11/30/how-to-deploy-next.js-sites-to-netlify/)
-
-### Post-Deployment Checklist
-
-- [ ] Verify all environment variables are set
-- [ ] Run database migrations
-- [ ] Seed initial plans (`npm run db:seed`)
-- [ ] Create admin user (`node scripts/create-admin.js`)
-- [ ] Test authentication flow
-- [ ] Test file upload
-- [ ] Test payment integration
-- [ ] Configure custom domain
-- [ ] Set up error monitoring (Sentry)
-
-**Detailed deployment guide:** [`DEPLOYMENT_GUIDE.md`](./DEPLOYMENT_GUIDE.md)
-
----
-
 ## 📁 Project Structure
 
 ```
@@ -532,26 +488,6 @@ cloudinary-saas/
 
 ---
 
-## 📸 Screenshots
-
-### Dashboard
-![Dashboard](./screenshots/dashboard.png)
-*Main dashboard with media library and analytics*
-
-### Media Upload
-![Upload](./screenshots/upload.png)
-*Bulk upload with background processing*
-
-### Analytics
-![Analytics](./screenshots/analytics.png)
-*Usage analytics and insights*
-
-### Subscription Plans
-![Plans](./screenshots/plans.png)
-*Three-tier subscription system*
-
----
-
 ## 🤝 Contributing
 
 Contributions are welcome! Please follow these steps:
@@ -581,12 +517,6 @@ Contributions are welcome! Please follow these steps:
 
 ---
 
-## 📝 License
-
-This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
-
----
-
 ## 🙏 Acknowledgments
 
 - [Next.js](https://nextjs.org/) - Amazing React framework
@@ -610,15 +540,11 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 - **Live Demo:** [Coming Soon]
 - **Documentation:** [API_DOCUMENTATION.md](./API_DOCUMENTATION.md)
-- **Deployment Guide:** [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)
-- **Issues:** [GitHub Issues](https://github.com/alihazzem/Sahab-SaaS/issues)
 
 ---
 
 <div align="center">
 
 **Made with ❤️ by Ali Hazzem**
-
-⭐ Star this repo if you find it helpful!
 
 </div>
