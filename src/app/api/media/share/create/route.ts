@@ -3,6 +3,8 @@ import { auth } from '@clerk/nextjs/server'
 import prisma from '@/lib/prisma'
 import { nanoid } from 'nanoid'
 
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/media/share/create
  * Create a shareable link for a media item

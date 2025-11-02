@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import prisma from '@/lib/prisma'
 
+export const dynamic = 'force-dynamic';
+
 // POST /api/notifications/mark-all-read - Mark all notifications as read
 export async function POST() {
     try {

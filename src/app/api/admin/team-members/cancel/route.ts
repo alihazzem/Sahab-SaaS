@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { requireAdminAccess, cancelInvitation } from '@/lib/admin'
 import { auth } from '@clerk/nextjs/server'
 
+export const dynamic = 'force-dynamic';
+
 // POST - Cancel pending invitation
 export async function POST(request: Request) {
     const adminCheck = await requireAdminAccess()

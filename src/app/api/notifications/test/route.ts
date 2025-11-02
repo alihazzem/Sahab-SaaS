@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { createNotification } from '@/lib/notifications'
 
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/notifications/test
  * Create test notifications for development/testing

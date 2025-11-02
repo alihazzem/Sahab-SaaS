@@ -4,6 +4,8 @@ import prisma from '@/lib/prisma'
 import { v2 as cloudinary } from 'cloudinary'
 import { notifyUploadFailed } from '@/lib/notifications'
 
+export const dynamic = 'force-dynamic';
+
 // Configure Cloudinary
 cloudinary.config({
     cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,

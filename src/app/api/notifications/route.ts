@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import prisma from '@/lib/prisma'
 
+export const dynamic = 'force-dynamic';
+
 // GET /api/notifications - Get user's notifications
 export async function GET(request: Request) {
     try {

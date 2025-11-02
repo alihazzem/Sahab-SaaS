@@ -3,6 +3,8 @@ import { requireAdminAccess, inviteTeamMember, removeTeamMember } from '@/lib/ad
 import { auth } from '@clerk/nextjs/server'
 import prisma from '@/lib/prisma'
 
+export const dynamic = 'force-dynamic';
+
 // Email validation regex
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 

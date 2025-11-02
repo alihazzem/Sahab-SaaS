@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { requireAdminAccess, resendInvitation } from '@/lib/admin'
 import { auth } from '@clerk/nextjs/server'
 
+export const dynamic = 'force-dynamic';
+
 // POST - Resend invitation email
 export async function POST(request: Request) {
     const adminCheck = await requireAdminAccess()

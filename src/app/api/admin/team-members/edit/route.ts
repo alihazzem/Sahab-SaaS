@@ -3,6 +3,8 @@ import { requireAdminAccess } from '@/lib/admin'
 import { auth } from '@clerk/nextjs/server'
 import prisma from '@/lib/prisma'
 
+export const dynamic = 'force-dynamic';
+
 // Valid team roles
 const VALID_ROLES = ['MEMBER', 'MANAGER', 'ADMIN'] as const
 type TeamRole = typeof VALID_ROLES[number]

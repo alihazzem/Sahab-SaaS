@@ -3,6 +3,8 @@ import { auth } from "@clerk/nextjs/server";
 import prisma from "@/lib/prisma";
 import cloudinary from "@/lib/cloudinary";
 
+export const dynamic = 'force-dynamic';
+
 export async function DELETE(req: Request) {
     try {
         const { userId } = await auth();

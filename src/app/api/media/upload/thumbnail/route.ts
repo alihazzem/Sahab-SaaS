@@ -5,6 +5,8 @@ import { isValidImageStrict } from "@/lib/validate";
 import prisma from "@/lib/prisma";
 import { notifyUploadSuccess } from "@/lib/notifications";
 
+export const dynamic = 'force-dynamic';
+
 const MAX_THUMBNAIL_SIZE = 2 * 1024 * 1024; // 2MB for thumbnails/profile pics
 
 export async function POST(req: NextRequest) {

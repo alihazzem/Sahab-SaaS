@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { requireAdminAccess } from '@/lib/admin';
 import prisma from '@/lib/prisma';
 
+// Mark as dynamic to prevent build-time data collection
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
     try {
         // Check admin access

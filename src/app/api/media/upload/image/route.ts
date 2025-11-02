@@ -15,6 +15,7 @@ import {
 } from "@/lib/usage-limits";
 import { notifyUploadSuccess } from "@/lib/notifications";
 
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
     try {

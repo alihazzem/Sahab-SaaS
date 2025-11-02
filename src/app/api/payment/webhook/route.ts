@@ -4,6 +4,8 @@ import prisma from '@/lib/prisma';
 import { clerkClient } from '@clerk/nextjs/server';
 import { notifyPaymentSuccess, notifyPaymentFailed } from '@/lib/notifications';
 
+export const dynamic = 'force-dynamic';
+
 // Create Paymob client instance
 const paymobClientInstance = new PaymobClient();
 
